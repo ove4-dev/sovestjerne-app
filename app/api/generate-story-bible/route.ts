@@ -73,12 +73,23 @@ Svar KUN som JSON:
     }),
   });
 
-  const aiData = await openaiResponse.json();
-  const text = aiData.choices?.[0]?.message?.content;
+ const aiData = await openaiResponse.json();
 
-  if (!text) {
-    return NextResponse.json({ error: 'OpenAI ga ikke svar.' }, { status: 500 });
-  }
+if (!openaiResponse.ok) {
+  return NextResponse.json({
+    error: 'OpenAI-feil',
+    details: aiData
+  }, { status: 500 });
+}
+
+const text = aiData.choices?.[0]?.message?.content;
+
+if (!text) {
+  return NextResponse.json({
+    error: 'OpenAI ga ikke svar.',
+    details: aiData
+  }, { status: 500 });
+}
 
   let bible;
 
