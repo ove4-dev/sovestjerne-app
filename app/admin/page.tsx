@@ -318,15 +318,70 @@ export default function AdminPage() {
                       <small>{row.interests || '-'}</small>
                     </td>
 
-                    <td>
-                      Status: <strong>{row.subscription_status || 'active'}</strong><br />
-                      Neste: {row.next_chapter_date
-                        ? new Date(row.next_chapter_date).toLocaleDateString('nb-NO')
-                        : '-'}<br />
-                      Sist sendt: {row.last_chapter_sent_at
-                        ? new Date(row.last_chapter_sent_at).toLocaleDateString('nb-NO')
-                        : '-'}
-                    </td>
+                   <td>
+  <strong>{row.subscription_status || 'active'}</strong>
+
+  <br />
+
+  {(() => {
+    if (!row.next_chapter_date) {
+      return (
+        <span style={{ color: '#999' }}>
+          Ingen dato satt
+        </span>
+      );
+    }
+
+    const nextDate = new Date(row.next_chapter_date);
+    const today = new Date();
+
+    nextDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor(
+      (nextDate.getTime() - today.getTime()) /
+      (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays <= 0) {
+      return (
+        <div>
+          🔴 <strong>Skal ha nytt kapittel i dag</strong>
+        </div>
+      );
+    }
+
+    if (diffDays <= 3) {
+      return (
+        <div>
+          🟡 Neste kapittel om {diffDays} dager
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        🟢 Neste kapittel om {diffDays} dager
+      </div>
+    );
+  })()}
+
+  <br />
+
+  Neste dato:
+  <br />
+  {row.next_chapter_date
+    ? new Date(row.next_chapter_date).toLocaleDateString('nb-NO')
+    : '-'}
+
+  <br />
+
+  Sist sendt:
+  <br />
+  {row.last_chapter_sent_at
+    ? new Date(row.last_chapter_sent_at).toLocaleDateString('nb-NO')
+    : '-'}
+</td>
 
                     <td>
                       {bible ? (
