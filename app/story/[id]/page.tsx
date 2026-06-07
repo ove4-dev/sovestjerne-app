@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 type StoryPageProps = {
   params: Promise<{ id: string }>;
