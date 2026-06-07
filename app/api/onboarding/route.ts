@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 function asTextArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
