@@ -45,6 +45,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   async function load(event?: FormEvent) {
     event?.preventDefault();
@@ -131,6 +132,43 @@ export default function AdminPage() {
     }
   }
 
+  async function approveStory(storyId: string) {
+    setError('');
+    setMessage('');
+    setApprovingId(storyId);
+
+    try {
+      const response = await fetch('/api/approve-story', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({ storyId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke godkjenne historien.');
+      }
+
+      setMessage('Historien ble godkjent.');
+
+      setSelectedStory((current) =>
+        current && current.id === storyId
+          ? { ...current, status: 'approved' }
+          : current
+      );
+
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Noe gikk galt.');
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
   function openLatestStory(row: ChildRow) {
     const stories = row.stories || [];
     const latest = [...stories].sort(
@@ -151,7 +189,7 @@ export default function AdminPage() {
     <main className="admin-wrap">
       <div className="admin-card">
         <h1>🌙 Sovestjerne admin</h1>
-        <p>Se eventyrprofiler, generer Story Bible og les kapitler.</p>
+        <p>Se eventyrprofiler, generer Story Bible, les og godkjenn kapitler.</p>
 
         <form className="admin-login" onSubmit={load}>
           <input
@@ -194,6 +232,28 @@ export default function AdminPage() {
             </div>
 
             <br />
+
+            {selectedStory.status !== 'approved' && (
+              <>
+                <button
+                  className="small-btn"
+                  type="button"
+                  onClick={() => approveStory(selectedStory.id)}
+                  disabled={approvingId === selectedStory.id}
+                >
+                  {approvingId === selectedStory.id ? 'Godkjenner...' : '✅ Godkjenn historie'}
+                </button>
+
+                <br />
+                <br />
+              </>
+            )}
+
+            {selectedStory.status === 'approved' && (
+              <>
+                <p className="notice">✅ Denne historien er godkjent.</p>
+              </>
+            )}
 
             <button className="small-btn" type="button" onClick={() => setSelectedStory(null)}>
               Lukk historie
