@@ -44,9 +44,13 @@ export default function AdminPage() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Feil passord eller feil i systemet.');
-      }
+     if (!response.ok) {
+  throw new Error(
+    result.details
+      ? `${result.error}: ${JSON.stringify(result.details)}`
+      : result.error || 'Kunne ikke generere Story Bible.'
+  );
+}
 
       setRows(result.children || []);
     } catch (err) {
