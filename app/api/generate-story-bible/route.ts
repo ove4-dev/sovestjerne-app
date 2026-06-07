@@ -40,7 +40,14 @@ Drømmer: ${child.dreams || ''}
 
 Lag et trygt, varmt og magisk eventyrunivers som kan vare i minst 52 kapitler.
 
-Svar KUN som JSON:
+Viktig:
+- Barnet skal være hovedpersonen.
+- Det skal være varmt, trygt og egnet som godnatthistorie.
+- Ikke bruk skumle eller voldelige elementer.
+- Lag en tydelig følgesvenn basert på barnets favorittdyr hvis mulig.
+- Lag et oppdrag som kan fortsette uke etter uke.
+
+Svar KUN som gyldig JSON uten markdown:
 {
   "universe_name": "",
   "main_character": "",
@@ -54,7 +61,7 @@ Svar KUN som JSON:
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -62,7 +69,7 @@ Svar KUN som JSON:
       messages: [
         {
           role: 'system',
-          content: 'Du er en ekspert på trygge, magiske godnatthistorier for barn.',
+          content: 'Du er en ekspert på trygge, magiske godnatthistorier for barn. Du svarer alltid med ren JSON når du blir bedt om det.',
         },
         {
           role: 'user',
@@ -73,30 +80,42 @@ Svar KUN som JSON:
     }),
   });
 
- const aiData = await openaiResponse.json();
+  const aiData = await openaiResponse.json();
 
-if (!openaiResponse.ok) {
-  return NextResponse.json({
-    error: 'OpenAI-feil',
-    details: aiData
-  }, { status: 500 });
-}
+  if (!openaiResponse.ok) {
+    return NextResponse.json(
+      {
+        error: 'OpenAI-feil',
+        details: aiData,
+      },
+      { status: 500 }
+    );
+  }
 
-const text = aiData.choices?.[0]?.message?.content;
+  const text = aiData.choices?.[0]?.message?.content;
 
-if (!text) {
-  return NextResponse.json({
-    error: 'OpenAI ga ikke svar.',
-    details: aiData
-  }, { status: 500 });
-}
+  if (!text) {
+    return NextResponse.json(
+      {
+        error: 'OpenAI ga ikke svar.',
+        details: aiData,
+      },
+      { status: 500 }
+    );
+  }
 
   let bible;
 
   try {
     bible = JSON.parse(text);
   } catch {
-    return NextResponse.json({ error: 'Kunne ikke lese AI-svar som JSON.', raw: text }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Kunne ikke lese AI-svar som JSON.',
+        raw: text,
+      },
+      { status: 500 }
+    );
   }
 
   const { data, error } = await supabaseAdmin
@@ -115,8 +134,17 @@ if (!text) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: 'Kunne ikke lagre Story Bible.' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Kunne ikke lagre Story Bible.',
+        details: error,
+      },
+      { status: 500 }
+    );
   }
 
-  return NextResponse.json({ storyBible: data });
+  return NextResponse.json({
+    success: true,
+    storyBible: data,
+  });
 }
