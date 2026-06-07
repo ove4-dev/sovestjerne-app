@@ -35,7 +35,6 @@ export default async function StoryPage({ params }: StoryPageProps) {
           </div>
 
           <h1>{story.title || 'Sovestjerne-eventyr'}</h1>
-
           <p>Kapittel {story.chapter_number || 1}</p>
         </section>
 
