@@ -1,6 +1,12 @@
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
-export default async function StoryPage({ params }: { params: { id: string } }) {
+type StoryPageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function StoryPage({ params }: StoryPageProps) {
+  const { id } = await params;
+
   const { data: story, error } = await supabaseAdmin
     .from('stories')
     .select(`
@@ -9,11 +15,9 @@ export default async function StoryPage({ params }: { params: { id: string } }) 
       story_text,
       chapter_number,
       created_at,
-      children (
-        child_name
-      )
+      child_id
     `)
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (error || !story) {
@@ -29,10 +33,19 @@ export default async function StoryPage({ params }: { params: { id: string } }) 
     );
   }
 
-  const childName =
-    Array.isArray(story.children)
-      ? story.children[0]?.child_name
-      : story.children?.child_name;
+  let childName = 'barnet ditt';
+
+  if (story.child_id) {
+    const { data: child } = await supabaseAdmin
+      .from('children')
+      .select('child_name')
+      .eq('id', story.child_id)
+      .single();
+
+    if (child?.child_name) {
+      childName = child.child_name;
+    }
+  }
 
   return (
     <main className="page-shell">
@@ -45,14 +58,12 @@ export default async function StoryPage({ params }: { params: { id: string } }) 
           <h1>{story.title}</h1>
 
           <p>
-            Kapittel {story.chapter_number} for {childName || 'barnet ditt'}
+            Kapittel {story.chapter_number} for {childName}
           </p>
         </section>
 
         <section className="story-reader">
-          <div className="story-text-view">
-            {story.story_text}
-          </div>
+          <div className="story-text-view">{story.story_text}</div>
 
           <div className="story-footer">
             <p>🌙 Neste kapittel kommer snart.</p>
