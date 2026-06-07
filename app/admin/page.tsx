@@ -11,6 +11,18 @@ type StoryBible = {
   memory: string | null;
 };
 
+type Story = {
+  id: string;
+  created_at: string;
+  chapter_number: number | null;
+  title: string | null;
+  story_text: string | null;
+  summary: string | null;
+  status: string | null;
+  email_status: string | null;
+  sent_at: string | null;
+};
+
 type ChildRow = {
   id: string;
   created_at: string;
@@ -21,11 +33,14 @@ type ChildRow = {
   favorite_color: string | null;
   interests: string | null;
   story_bibles?: StoryBible[];
+  stories?: Story[];
 };
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [rows, setRows] = useState<ChildRow[]>([]);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [selectedChild, setSelectedChild] = useState<string>('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,6 +123,7 @@ export default function AdminPage() {
       }
 
       setMessage('Kapittel ble generert og lagret.');
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
     } finally {
@@ -115,11 +131,27 @@ export default function AdminPage() {
     }
   }
 
+  function openLatestStory(row: ChildRow) {
+    const stories = row.stories || [];
+    const latest = [...stories].sort(
+      (a, b) => (b.chapter_number || 0) - (a.chapter_number || 0)
+    )[0];
+
+    if (!latest) {
+      setError('Ingen kapittel er generert for dette barnet ennå.');
+      return;
+    }
+
+    setError('');
+    setSelectedChild(row.child_name);
+    setSelectedStory(latest);
+  }
+
   return (
     <main className="admin-wrap">
       <div className="admin-card">
         <h1>🌙 Sovestjerne admin</h1>
-        <p>Se eventyrprofiler, generer Story Bible og lag kapitler.</p>
+        <p>Se eventyrprofiler, generer Story Bible og les kapitler.</p>
 
         <form className="admin-login" onSubmit={load}>
           <input
@@ -137,6 +169,38 @@ export default function AdminPage() {
         {error && <p className="error">{error}</p>}
         {message && <p className="notice">{message}</p>}
 
+        {selectedStory && (
+          <div className="detail-card">
+            <h2>
+              {selectedChild} – {selectedStory.title || 'Uten tittel'}
+            </h2>
+
+            <p>
+              <strong>Kapittel:</strong> {selectedStory.chapter_number || '-'} <br />
+              <strong>Status:</strong> {selectedStory.status || '-'} <br />
+              <strong>E-post:</strong> {selectedStory.email_status || '-'}
+            </p>
+
+            {selectedStory.summary && (
+              <p>
+                <strong>Oppsummering:</strong> {selectedStory.summary}
+              </p>
+            )}
+
+            <hr />
+
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.75 }}>
+              {selectedStory.story_text}
+            </div>
+
+            <br />
+
+            <button className="small-btn" type="button" onClick={() => setSelectedStory(null)}>
+              Lukk historie
+            </button>
+          </div>
+        )}
+
         {rows.length > 0 && (
           <table className="admin-table">
             <thead>
@@ -147,6 +211,7 @@ export default function AdminPage() {
                 <th>Favoritter</th>
                 <th>Interesser</th>
                 <th>Story Bible</th>
+                <th>Siste kapittel</th>
                 <th>Handling</th>
               </tr>
             </thead>
@@ -154,6 +219,10 @@ export default function AdminPage() {
             <tbody>
               {rows.map((row) => {
                 const bible = row.story_bibles?.[0];
+                const stories = row.stories || [];
+                const latestStory = [...stories].sort(
+                  (a, b) => (b.chapter_number || 0) - (a.chapter_number || 0)
+                )[0];
 
                 return (
                   <tr key={row.id}>
@@ -192,6 +261,20 @@ export default function AdminPage() {
                     </td>
 
                     <td>
+                      {latestStory ? (
+                        <>
+                          <strong>{latestStory.title || 'Uten tittel'}</strong>
+                          <br />
+                          Kapittel {latestStory.chapter_number || '-'}
+                          <br />
+                          Status: {latestStory.status || '-'}
+                        </>
+                      ) : (
+                        'Ingen kapittel'
+                      )}
+                    </td>
+
+                    <td>
                       <button
                         className="small-btn"
                         type="button"
@@ -215,6 +298,18 @@ export default function AdminPage() {
                         disabled={generatingId === row.id || !bible}
                       >
                         {generatingId === row.id ? 'Jobber...' : 'Generer kapittel'}
+                      </button>
+
+                      <br />
+                      <br />
+
+                      <button
+                        className="small-btn"
+                        type="button"
+                        onClick={() => openLatestStory(row)}
+                        disabled={!latestStory}
+                      >
+                        Les siste kapittel
                       </button>
                     </td>
                   </tr>
