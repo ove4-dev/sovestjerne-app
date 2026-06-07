@@ -12,6 +12,28 @@ async function generateChapterForChild(childId: string) {
     return { childId, success: false, error: 'Fant ikke barnet.' };
   }
 
+  if (child.subscription_status !== 'active') {
+    return {
+      childId,
+      childName: child.child_name,
+      success: false,
+      skipped: true,
+      error: 'Abonnement ikke aktivt.',
+    };
+  }
+
+  const now = new Date();
+
+  if (child.next_chapter_date && new Date(child.next_chapter_date) > now) {
+    return {
+      childId,
+      childName: child.child_name,
+      success: false,
+      skipped: true,
+      error: 'Ikke tid for neste kapittel ennå.',
+    };
+  }
+
   const { data: bible, error: bibleError } = await supabaseAdmin
     .from('story_bibles')
     .select('*')
@@ -21,28 +43,11 @@ async function generateChapterForChild(childId: string) {
     .single();
 
   if (bibleError || !bible) {
-    return { childId, childName: child.child_name, success: false, error: 'Story Bible mangler.' };
-  }
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const { data: recentStory } = await supabaseAdmin
-    .from('stories')
-    .select('id, chapter_number, title, created_at')
-    .eq('child_id', childId)
-    .gte('created_at', sevenDaysAgo.toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (recentStory) {
     return {
       childId,
       childName: child.child_name,
       success: false,
-      skipped: true,
-      error: 'Har allerede fått kapittel de siste 7 dagene.',
+      error: 'Story Bible mangler.',
     };
   }
 
@@ -184,6 +189,17 @@ Svar KUN som gyldig JSON uten markdown:
     };
   }
 
+  const nextChapterDate = new Date();
+  nextChapterDate.setDate(nextChapterDate.getDate() + 7);
+
+  await supabaseAdmin
+    .from('children')
+    .update({
+      last_chapter_sent_at: new Date().toISOString(),
+      next_chapter_date: nextChapterDate.toISOString(),
+    })
+    .eq('id', childId);
+
   return {
     childId,
     childName: child.child_name,
@@ -191,6 +207,7 @@ Svar KUN som gyldig JSON uten markdown:
     storyId: data.id,
     chapterNumber: nextChapter,
     title: data.title,
+    nextChapterDate: nextChapterDate.toISOString(),
   };
 }
 
