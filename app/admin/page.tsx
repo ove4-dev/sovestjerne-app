@@ -47,6 +47,7 @@ export default function AdminPage() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
 
   async function load(event?: FormEvent) {
     event?.preventDefault();
@@ -130,6 +131,37 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
     } finally {
       setGeneratingId(null);
+    }
+  }
+
+  async function generateWeeklyStories() {
+    setError('');
+    setMessage('');
+    setWeeklyLoading(true);
+
+    try {
+      const response = await fetch('/api/generate-weekly', {
+        method: 'POST',
+        headers: {
+          'x-admin-password': password,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke generere ukens kapitler.');
+      }
+
+      setMessage(
+        `Ferdig! Generert: ${result.generated}, hoppet over: ${result.skipped}, feil: ${result.failed}`
+      );
+
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Noe gikk galt.');
+    } finally {
+      setWeeklyLoading(false);
     }
   }
 
@@ -226,6 +258,17 @@ export default function AdminPage() {
       <div className="admin-card">
         <h1>🌙 Sovestjerne admin</h1>
         <p>Se eventyrprofiler, generer, godkjenn og send kapitler.</p>
+
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            className="button"
+            type="button"
+            onClick={generateWeeklyStories}
+            disabled={weeklyLoading}
+          >
+            {weeklyLoading ? 'Genererer ukens kapitler...' : '🚀 Generer ukens kapitler'}
+          </button>
+        </div>
 
         <form className="admin-login" onSubmit={load}>
           <input
