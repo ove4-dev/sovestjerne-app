@@ -9,14 +9,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
 
   const { data: story, error } = await supabaseAdmin
     .from('stories')
-    .select(`
-      id,
-      title,
-      story_text,
-      chapter_number,
-      created_at,
-      child_id
-    `)
+    .select('id,title,story_text,chapter_number,created_at,child_id')
     .eq('id', id)
     .single();
 
@@ -33,20 +26,6 @@ export default async function StoryPage({ params }: StoryPageProps) {
     );
   }
 
-  let childName = 'barnet ditt';
-
-  if (story.child_id) {
-    const { data: child } = await supabaseAdmin
-      .from('children')
-      .select('child_name')
-      .eq('id', story.child_id)
-      .single();
-
-    if (child?.child_name) {
-      childName = child.child_name;
-    }
-  }
-
   return (
     <main className="page-shell">
       <div className="card">
@@ -55,11 +34,9 @@ export default async function StoryPage({ params }: StoryPageProps) {
             <span className="star">★</span> Sovestjerne
           </div>
 
-          <h1>{story.title}</h1>
+          <h1>{story.title || 'Sovestjerne-eventyr'}</h1>
 
-          <p>
-            Kapittel {story.chapter_number} for {childName}
-          </p>
+          <p>Kapittel {story.chapter_number || 1}</p>
         </section>
 
         <section className="story-reader">
