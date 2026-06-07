@@ -31,12 +31,26 @@ export async function GET(request: Request) {
         story_goal,
         current_chapter,
         memory
+      ),
+      stories (
+        id,
+        created_at,
+        chapter_number,
+        title,
+        story_text,
+        summary,
+        status,
+        email_status,
+        sent_at
       )
     `)
     .order('created_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: 'Kunne ikke hente data.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Kunne ikke hente data.', details: error },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ children: data });
