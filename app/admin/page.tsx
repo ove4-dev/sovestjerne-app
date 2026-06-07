@@ -44,13 +44,9 @@ export default function AdminPage() {
 
       const result = await response.json();
 
-     if (!response.ok) {
-  throw new Error(
-    result.details
-      ? `${result.error}: ${JSON.stringify(result.details)}`
-      : result.error || 'Kunne ikke generere Story Bible.'
-  );
-}
+      if (!response.ok) {
+        throw new Error(result.error || 'Feil passord eller feil i systemet.');
+      }
 
       setRows(result.children || []);
     } catch (err) {
@@ -90,11 +86,40 @@ export default function AdminPage() {
     }
   }
 
+  async function generateChapter(childId: string) {
+    setError('');
+    setMessage('');
+    setGeneratingId(childId);
+
+    try {
+      const response = await fetch('/api/generate-chapter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({ childId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke generere kapittel.');
+      }
+
+      setMessage('Kapittel ble generert og lagret.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Noe gikk galt.');
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
   return (
     <main className="admin-wrap">
       <div className="admin-card">
         <h1>🌙 Sovestjerne admin</h1>
-        <p>Se eventyrprofiler, generer Story Bible og klargjør historier.</p>
+        <p>Se eventyrprofiler, generer Story Bible og lag kapitler.</p>
 
         <form className="admin-login" onSubmit={load}>
           <input
@@ -174,10 +199,22 @@ export default function AdminPage() {
                         disabled={generatingId === row.id}
                       >
                         {generatingId === row.id
-                          ? 'Genererer...'
+                          ? 'Jobber...'
                           : bible
-                            ? 'Generer på nytt'
+                            ? 'Generer Story Bible på nytt'
                             : 'Generer Story Bible'}
+                      </button>
+
+                      <br />
+                      <br />
+
+                      <button
+                        className="small-btn"
+                        type="button"
+                        onClick={() => generateChapter(row.id)}
+                        disabled={generatingId === row.id || !bible}
+                      >
+                        {generatingId === row.id ? 'Jobber...' : 'Generer kapittel'}
                       </button>
                     </td>
                   </tr>
