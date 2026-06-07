@@ -259,16 +259,18 @@ export default function AdminPage() {
         <h1>🌙 Sovestjerne admin</h1>
         <p>Se eventyrprofiler, generer, godkjenn og send kapitler.</p>
 
-        <div style={{ marginBottom: '20px' }}>
-          <button
-            className="button"
-            type="button"
-            onClick={generateWeeklyStories}
-            disabled={weeklyLoading}
-          >
-            {weeklyLoading ? 'Genererer ukens kapitler...' : '🚀 Generer ukens kapitler'}
-          </button>
-        </div>
+        {rows.length > 0 && (
+  <div style={{ marginBottom: '20px', marginTop: '20px' }}>
+    <button
+      className="button"
+      type="button"
+      onClick={generateWeeklyStories}
+      disabled={weeklyLoading}
+    >
+      {weeklyLoading ? 'Genererer ukens kapitler...' : '🚀 Generer ukens kapitler'}
+    </button>
+  </div>
+)}
 
         <form className="admin-login" onSubmit={load}>
           <input
