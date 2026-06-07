@@ -32,6 +32,9 @@ type ChildRow = {
   favorite_animal: string | null;
   favorite_color: string | null;
   interests: string | null;
+  subscription_status?: string | null;
+  next_chapter_date?: string | null;
+  last_chapter_sent_at?: string | null;
   story_bibles?: StoryBible[];
   stories?: Story[];
 };
@@ -62,9 +65,7 @@ export default function AdminPage() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Feil passord eller feil i systemet.');
-      }
+      if (!response.ok) throw new Error(result.error || 'Feil passord.');
 
       setRows(result.children || []);
     } catch (err) {
@@ -82,18 +83,12 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/generate-story-bible', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
         body: JSON.stringify({ childId }),
       });
 
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke generere Story Bible.');
-      }
+      if (!response.ok) throw new Error(result.error || 'Kunne ikke generere Story Bible.');
 
       setMessage('Story Bible ble generert og lagret.');
       await load();
@@ -112,18 +107,12 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/generate-chapter', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
         body: JSON.stringify({ childId }),
       });
 
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke generere kapittel.');
-      }
+      if (!response.ok) throw new Error(result.error || 'Kunne ikke generere kapittel.');
 
       setMessage('Kapittel ble generert og lagret.');
       await load();
@@ -142,21 +131,13 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/generate-weekly', {
         method: 'POST',
-        headers: {
-          'x-admin-password': password,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       });
 
       const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Kunne ikke generere ukens kapitler.');
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke generere ukens kapitler.');
-      }
-
-      setMessage(
-        `Ferdig! Generert: ${result.generated}, hoppet over: ${result.skipped}, feil: ${result.failed}`
-      );
-
+      setMessage(`Ferdig! Generert: ${result.generated ?? 0}, hoppet over: ${result.skipped ?? 0}, feil: ${result.failed ?? 0}`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
@@ -173,25 +154,15 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/approve-story', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
         body: JSON.stringify({ storyId }),
       });
 
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke godkjenne historien.');
-      }
+      if (!response.ok) throw new Error(result.error || 'Kunne ikke godkjenne historien.');
 
       setMessage('Historien ble godkjent.');
-
-      setSelectedStory((current) =>
-        current && current.id === storyId ? { ...current, status: 'approved' } : current
-      );
-
+      setSelectedStory((current) => current && current.id === storyId ? { ...current, status: 'approved' } : current);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
@@ -208,27 +179,15 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/send-story', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
         body: JSON.stringify({ storyId }),
       });
 
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke sende historien.');
-      }
+      if (!response.ok) throw new Error(result.error || 'Kunne ikke sende historien.');
 
       setMessage('Historien ble sendt på e-post.');
-
-      setSelectedStory((current) =>
-        current && current.id === storyId
-          ? { ...current, email_status: 'sent', sent_at: new Date().toISOString() }
-          : current
-      );
-
+      setSelectedStory((current) => current && current.id === storyId ? { ...current, email_status: 'sent', sent_at: new Date().toISOString() } : current);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
@@ -237,40 +196,17 @@ export default function AdminPage() {
     }
   }
 
-  function openLatestStory(row: ChildRow) {
-    const stories = row.stories || [];
-    const latest = [...stories].sort(
-      (a, b) => (b.chapter_number || 0) - (a.chapter_number || 0)
-    )[0];
-
-    if (!latest) {
-      setError('Ingen kapittel er generert for dette barnet ennå.');
-      return;
-    }
-
+  function openStory(row: ChildRow, story: Story) {
     setError('');
     setSelectedChild(row.child_name);
-    setSelectedStory(latest);
+    setSelectedStory(story);
   }
 
   return (
     <main className="admin-wrap">
       <div className="admin-card">
         <h1>🌙 Sovestjerne admin</h1>
-        <p>Se eventyrprofiler, generer, godkjenn og send kapitler.</p>
-
-        {rows.length > 0 && (
-  <div style={{ marginBottom: '20px', marginTop: '20px' }}>
-    <button
-      className="button"
-      type="button"
-      onClick={generateWeeklyStories}
-      disabled={weeklyLoading}
-    >
-      {weeklyLoading ? 'Genererer ukens kapitler...' : '🚀 Generer ukens kapitler'}
-    </button>
-  </div>
-)}
+        <p>Se alle barn, kapitler, status, godkjenning og utsending.</p>
 
         <form className="admin-login" onSubmit={load}>
           <input
@@ -279,20 +215,25 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Admin-passord"
           />
-
           <button className="button" type="submit" disabled={loading}>
             {loading ? 'Laster...' : 'Åpne admin'}
           </button>
         </form>
+
+        {rows.length > 0 && (
+          <div style={{ marginBottom: '20px', marginTop: '20px' }}>
+            <button className="button" type="button" onClick={generateWeeklyStories} disabled={weeklyLoading}>
+              {weeklyLoading ? 'Genererer ukens kapitler...' : '🚀 Generer ukens kapitler'}
+            </button>
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
         {message && <p className="notice">{message}</p>}
 
         {selectedStory && (
           <div className="detail-card">
-            <h2>
-              {selectedChild} – {selectedStory.title || 'Uten tittel'}
-            </h2>
+            <h2>{selectedChild} – {selectedStory.title || 'Uten tittel'}</h2>
 
             <p>
               <strong>Kapittel:</strong> {selectedStory.chapter_number || '-'} <br />
@@ -301,9 +242,7 @@ export default function AdminPage() {
             </p>
 
             {selectedStory.summary && (
-              <p>
-                <strong>Oppsummering:</strong> {selectedStory.summary}
-              </p>
+              <p><strong>Oppsummering:</strong> {selectedStory.summary}</p>
             )}
 
             <hr />
@@ -316,35 +255,20 @@ export default function AdminPage() {
 
             {selectedStory.status !== 'approved' && (
               <>
-                <button
-                  className="small-btn"
-                  type="button"
-                  onClick={() => approveStory(selectedStory.id)}
-                  disabled={approvingId === selectedStory.id}
-                >
+                <button className="small-btn" type="button" onClick={() => approveStory(selectedStory.id)} disabled={approvingId === selectedStory.id}>
                   {approvingId === selectedStory.id ? 'Godkjenner...' : '✅ Godkjenn historie'}
                 </button>
-
-                <br />
-                <br />
+                <br /><br />
               </>
             )}
 
             {selectedStory.status === 'approved' && selectedStory.email_status !== 'sent' && (
               <>
                 <p className="notice">✅ Denne historien er godkjent og klar til sending.</p>
-
-                <button
-                  className="small-btn"
-                  type="button"
-                  onClick={() => sendStory(selectedStory.id)}
-                  disabled={sendingId === selectedStory.id}
-                >
+                <button className="small-btn" type="button" onClick={() => sendStory(selectedStory.id)} disabled={sendingId === selectedStory.id}>
                   {sendingId === selectedStory.id ? 'Sender...' : '📩 Send historie'}
                 </button>
-
-                <br />
-                <br />
+                <br /><br />
               </>
             )}
 
@@ -365,10 +289,9 @@ export default function AdminPage() {
                 <th>Dato</th>
                 <th>Forelder</th>
                 <th>Barn</th>
-                <th>Favoritter</th>
-                <th>Interesser</th>
+                <th>Abonnement</th>
                 <th>Story Bible</th>
-                <th>Siste kapittel</th>
+                <th>Alle kapitler</th>
                 <th>Handling</th>
               </tr>
             </thead>
@@ -376,39 +299,41 @@ export default function AdminPage() {
             <tbody>
               {rows.map((row) => {
                 const bible = row.story_bibles?.[0];
-                const stories = row.stories || [];
-                const latestStory = [...stories].sort(
-                  (a, b) => (b.chapter_number || 0) - (a.chapter_number || 0)
-                )[0];
+                const stories = [...(row.stories || [])].sort(
+                  (a, b) => (a.chapter_number || 0) - (b.chapter_number || 0)
+                );
 
                 return (
                   <tr key={row.id}>
                     <td>{new Date(row.created_at).toLocaleDateString('nb-NO')}</td>
+
                     <td>{row.parent_email}</td>
 
                     <td>
-                      <strong>{row.child_name}</strong>
-                      <br />
-                      {row.child_age} år
+                      <strong>{row.child_name}</strong><br />
+                      {row.child_age} år<br />
+                      <small>
+                        {row.favorite_animal || '-'} / {row.favorite_color || '-'}
+                      </small><br />
+                      <small>{row.interests || '-'}</small>
                     </td>
 
                     <td>
-                      {row.favorite_animal || '-'}
-                      <br />
-                      {row.favorite_color || '-'}
+                      Status: <strong>{row.subscription_status || 'active'}</strong><br />
+                      Neste: {row.next_chapter_date
+                        ? new Date(row.next_chapter_date).toLocaleDateString('nb-NO')
+                        : '-'}<br />
+                      Sist sendt: {row.last_chapter_sent_at
+                        ? new Date(row.last_chapter_sent_at).toLocaleDateString('nb-NO')
+                        : '-'}
                     </td>
-
-                    <td>{row.interests || '-'}</td>
 
                     <td>
                       {bible ? (
                         <>
-                          <strong>{bible.universe_name || '-'}</strong>
-                          <br />
-                          Følgesvenn: {bible.companion_name || '-'}
-                          <br />
-                          Kapittel: {bible.current_chapter || 1}
-                          <br />
+                          <strong>{bible.universe_name || '-'}</strong><br />
+                          Følgesvenn: {bible.companion_name || '-'}<br />
+                          Kapittel: {bible.current_chapter || 1}<br />
                           <small>{bible.story_goal || ''}</small>
                         </>
                       ) : (
@@ -417,28 +342,25 @@ export default function AdminPage() {
                     </td>
 
                     <td>
-                      {latestStory ? (
-                        <>
-                          <strong>{latestStory.title || 'Uten tittel'}</strong>
-                          <br />
-                          Kapittel {latestStory.chapter_number || '-'}
-                          <br />
-                          Status: {latestStory.status || '-'}
-                          <br />
-                          E-post: {latestStory.email_status || '-'}
-                        </>
+                      {stories.length > 0 ? (
+                        stories.map((story) => (
+                          <div key={story.id} style={{ marginBottom: '10px' }}>
+                            <button className="small-btn" type="button" onClick={() => openStory(row, story)}>
+                              Les kapittel {story.chapter_number || '-'}
+                            </button>
+                            <br />
+                            <small>
+                              {story.status || '-'} / {story.email_status || '-'}
+                            </small>
+                          </div>
+                        ))
                       ) : (
-                        'Ingen kapittel'
+                        <span>Ingen kapitler</span>
                       )}
                     </td>
 
                     <td>
-                      <button
-                        className="small-btn"
-                        type="button"
-                        onClick={() => generateStoryBible(row.id)}
-                        disabled={generatingId === row.id}
-                      >
+                      <button className="small-btn" type="button" onClick={() => generateStoryBible(row.id)} disabled={generatingId === row.id}>
                         {generatingId === row.id
                           ? 'Jobber...'
                           : bible
@@ -446,28 +368,10 @@ export default function AdminPage() {
                             : 'Generer Story Bible'}
                       </button>
 
-                      <br />
-                      <br />
+                      <br /><br />
 
-                      <button
-                        className="small-btn"
-                        type="button"
-                        onClick={() => generateChapter(row.id)}
-                        disabled={generatingId === row.id || !bible}
-                      >
+                      <button className="small-btn" type="button" onClick={() => generateChapter(row.id)} disabled={generatingId === row.id || !bible}>
                         {generatingId === row.id ? 'Jobber...' : 'Generer kapittel'}
-                      </button>
-
-                      <br />
-                      <br />
-
-                      <button
-                        className="small-btn"
-                        type="button"
-                        onClick={() => openLatestStory(row)}
-                        disabled={!latestStory}
-                      >
-                        Les siste kapittel
                       </button>
                     </td>
                   </tr>
