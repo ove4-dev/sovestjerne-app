@@ -31,6 +31,42 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    const token = String(body.token || '').trim();
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Mangler onboarding-token.' },
+        { status: 400 }
+      );
+    }
+
+    const { data: onboardingToken, error: tokenError } = await supabaseAdmin
+      .from('onboarding_tokens')
+      .select('*')
+      .eq('token', token)
+      .single();
+
+    if (tokenError || !onboardingToken) {
+      return NextResponse.json(
+        { error: 'Ugyldig onboarding-token.' },
+        { status: 400 }
+      );
+    }
+
+    if (onboardingToken.used) {
+      return NextResponse.json(
+        { error: 'Denne onboarding-lenken er allerede brukt.' },
+        { status: 400 }
+      );
+    }
+
+    if (new Date(onboardingToken.expires_at) < new Date()) {
+      return NextResponse.json(
+        { error: 'Denne onboarding-lenken har utløpt.' },
+        { status: 400 }
+      );
+    }
+
     const parentEmail = String(body.parentEmail || '').trim().toLowerCase();
     const parentName = String(body.parentName || '').trim();
     const childName = String(body.childName || '').trim();
@@ -44,16 +80,35 @@ export async function POST(request: Request) {
     const dreams = String(body.dreams || '').trim();
 
     if (!parentEmail || !childName || !childAge) {
-      return NextResponse.json({ error: 'E-post, barnets navn og alder må fylles ut.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'E-post, barnets navn og alder må fylles ut.' },
+        { status: 400 }
+      );
+    }
+
+    if (onboardingToken.parent_email.toLowerCase() !== parentEmail) {
+      return NextResponse.json(
+        { error: 'E-posten matcher ikke onboarding-lenken.' },
+        { status: 400 }
+      );
     }
 
     const { data: parent, error: parentError } = await supabaseAdmin
       .from('parents')
-      .upsert({ email: parentEmail, name: parentName, subscription_status: 'pending' }, { onConflict: 'email' })
+      .upsert(
+        {
+          email: parentEmail,
+          name: parentName,
+          subscription_status: 'pending',
+        },
+        { onConflict: 'email' }
+      )
       .select('id')
       .single();
 
-    if (parentError || !parent) throw parentError || new Error('Kunne ikke lagre forelder.');
+    if (parentError || !parent) {
+      throw parentError || new Error('Kunne ikke lagre forelder.');
+    }
 
     const { data: child, error: childError } = await supabaseAdmin
       .from('children')
@@ -69,31 +124,50 @@ export async function POST(request: Request) {
         personality: personality.join(', '),
         things_to_avoid: thingsToAvoid.join(', '),
         dreams,
+        subscription_status: 'active',
+        subscription_started_at: new Date().toISOString(),
+        next_chapter_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select('id')
       .single();
 
-    if (childError || !child) throw childError || new Error('Kunne ikke lagre barnet.');
+    if (childError || !child) {
+      throw childError || new Error('Kunne ikke lagre barnet.');
+    }
 
     const universe = pickUniverse(interests, favoriteAnimal);
     const companion = companionFromAnimal(favoriteAnimal);
 
-    const { error: bibleError } = await supabaseAdmin.from('story_bibles').insert({
-      child_id: child.id,
-      universe_name: universe,
-      main_character: childName,
-      companion_name: companion.name,
-      companion_type: companion.type,
-      story_goal: `Finne de syv drømmestjernene sammen med ${companion.name}.`,
-      current_chapter: 1,
-      memory: `${childName} er ${childAge} år. Barnet liker ${interests.join(', ') || 'eventyr'}${favoriteAnimal ? ` og favorittdyret er ${favoriteAnimal}` : ''}. Eventyret starter i ${universe}.`,
-    });
+    const { error: bibleError } = await supabaseAdmin
+      .from('story_bibles')
+      .insert({
+        child_id: child.id,
+        universe_name: universe,
+        main_character: childName,
+        companion_name: companion.name,
+        companion_type: companion.type,
+        story_goal: `Finne de syv drømmestjernene sammen med ${companion.name}.`,
+        current_chapter: 1,
+        memory: `${childName} er ${childAge} år. Barnet liker ${
+          interests.join(', ') || 'eventyr'
+        }${favoriteAnimal ? ` og favorittdyret er ${favoriteAnimal}` : ''}. Eventyret starter i ${universe}.`,
+      });
 
-    if (bibleError) throw bibleError;
+    if (bibleError) {
+      throw bibleError;
+    }
+
+    await supabaseAdmin
+      .from('onboarding_tokens')
+      .update({ used: true })
+      .eq('id', onboardingToken.id);
 
     return NextResponse.json({ ok: true, childId: child.id });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'Kunne ikke lagre eventyrprofilen akkurat nå.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Kunne ikke lagre eventyrprofilen akkurat nå.' },
+      { status: 500 }
+    );
   }
 }
