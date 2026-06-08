@@ -46,6 +46,7 @@ export async function POST(request: Request) {
   const childName = child.child_name || 'barnet ditt';
 
   const storyUrl = `https://app.sovestjerne.no/story/${story.id}`;
+  const portalUrl = `https://app.sovestjerne.no/foreldre/login`;
   const subject = `🌙 ${story.title || `Nytt kapittel for ${childName}`}`;
 
   const html = `
@@ -61,15 +62,28 @@ export async function POST(request: Request) {
         <p>Hei!</p>
         <p>Et nytt Sovestjerne-kapittel for <strong>${childName}</strong> er klart.</p>
 
-        <p style="text-align:center;margin:30px 0;">
+        <p style="text-align:center;margin:30px 0 16px;">
           <a href="${storyUrl}" style="background:#30a05c;color:white;text-decoration:none;padding:16px 24px;border-radius:999px;font-weight:bold;display:inline-block;">
             ✨ Les eventyret
           </a>
         </p>
 
-        <p style="color:#64748b;font-size:14px;">
-          Hvis knappen ikke virker, kan du åpne denne lenken:<br>
-          <a href="${storyUrl}">${storyUrl}</a>
+        <p style="text-align:center;margin:12px 0 30px;">
+          <a href="${portalUrl}" style="background:#071437;color:white;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:bold;display:inline-block;">
+            👨‍👩‍👧 Gå til foreldreportalen
+          </a>
+        </p>
+
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:16px;margin-top:18px;">
+          <p style="margin:0;color:#92400e;font-weight:bold;">
+            I foreldreportalen kan du lese alle kapitler og se når neste eventyr kommer.
+          </p>
+        </div>
+
+        <p style="color:#64748b;font-size:14px;margin-top:22px;">
+          Hvis knappene ikke virker, kan du åpne lenkene her:<br>
+          Eventyr: <a href="${storyUrl}">${storyUrl}</a><br>
+          Foreldreportal: <a href="${portalUrl}">${portalUrl}</a>
         </p>
       </div>
 
