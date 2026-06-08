@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Sovestjerne <onboarding@resend.dev>',
+      from: 'Sovestjerne <eventyr@sovestjerne.no>',
       to: parentEmail,
       subject,
       html,
