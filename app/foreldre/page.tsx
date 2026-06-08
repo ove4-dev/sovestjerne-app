@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabaseClient } from '../../lib/supabaseClient';
 
 type Story = {
   id: string;
@@ -15,10 +14,6 @@ type Story = {
 type Child = {
   id: string;
   child_name: string;
-  child_age: number | null;
-  favorite_animal: string | null;
-  favorite_color: string | null;
-  interests: string | null;
   next_chapter_date: string | null;
   subscription_status: string | null;
   stories: Story[];
@@ -31,28 +26,15 @@ export default function ParentPortalPage() {
 
   useEffect(() => {
     async function loadPortal() {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const response = await fetch('/api/parent-data');
+      const result = await response.json();
 
-      if (!token) {
+      if (!response.ok) {
         window.location.href = '/foreldre/login';
         return;
       }
 
-      const response = await fetch('/api/parent-data', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setError(result.error || 'Kunne ikke hente foreldreportalen.');
-      } else {
-        setChildren(result.children || []);
-      }
-
+      setChildren(result.children || []);
       setLoading(false);
     }
 
@@ -60,7 +42,7 @@ export default function ParentPortalPage() {
   }, []);
 
   async function logout() {
-    await supabaseClient.auth.signOut();
+    document.cookie = 'parent_email=; Max-Age=0; path=/';
     window.location.href = '/foreldre/login';
   }
 
@@ -104,8 +86,6 @@ export default function ParentPortalPage() {
                 <h2>{child.child_name}</h2>
 
                 <p>
-                  <strong>Alder:</strong> {child.child_age || '-'} år<br />
-                  <strong>Status:</strong> {child.subscription_status || 'active'}<br />
                   <strong>Neste kapittel:</strong>{' '}
                   {child.next_chapter_date
                     ? new Date(child.next_chapter_date).toLocaleDateString('nb-NO')
@@ -124,9 +104,13 @@ export default function ParentPortalPage() {
                       <strong>
                         Kapittel {story.chapter_number}: {story.title || 'Uten tittel'}
                       </strong>
-                      <br />
 
-                      {story.summary && <small>{story.summary}</small>}
+                      {story.summary && (
+                        <>
+                          <br />
+                          <small>{story.summary}</small>
+                        </>
+                      )}
 
                       <br />
                       <br />
