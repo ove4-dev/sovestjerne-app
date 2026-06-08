@@ -65,6 +65,7 @@ export default function AdminPage() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [imageLoadingId, setImageLoadingId] = useState<string | null>(null);
+  const [approvingImageId, setApprovingImageId] = useState<string | null>(null);
 
   async function load(event?: FormEvent) {
     event?.preventDefault();
@@ -235,15 +236,45 @@ export default function AdminPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Kunne ikke generere bildeprompt.');
+        throw new Error(result.error || 'Kunne ikke generere bilde.');
       }
 
-      setMessage('Bildeprompt ble generert og lagret.');
+      setMessage('Bilde ble generert og lagret.');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
     } finally {
       setImageLoadingId(null);
+    }
+  }
+
+  async function approveImage(imageId: string) {
+    setError('');
+    setMessage('');
+    setApprovingImageId(imageId);
+
+    try {
+      const response = await fetch('/api/approve-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({ imageId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunne ikke godkjenne bilde.');
+      }
+
+      setMessage('Bilde ble godkjent.');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunne ikke godkjenne bilde.');
+    } finally {
+      setApprovingImageId(null);
     }
   }
 
@@ -324,11 +355,44 @@ export default function AdminPage() {
                         borderRadius: '18px',
                         display: 'block',
                         marginTop: '14px',
+                        marginBottom: '18px',
                       }}
                     />
                   ) : (
                     <p>Ingen bildefil ennå.</p>
                   )}
+
+                  {selectedStory.story_images[0].status !== 'approved' && (
+                    <>
+                      <button
+                        className="small-btn"
+                        type="button"
+                        onClick={() => approveImage(selectedStory.story_images?.[0]?.id || '')}
+                        disabled={approvingImageId === selectedStory.story_images[0].id}
+                      >
+                        {approvingImageId === selectedStory.story_images[0].id
+                          ? 'Godkjenner bilde...'
+                          : '✅ Godkjenn bilde'}
+                      </button>
+
+                      <br /><br />
+                    </>
+                  )}
+
+                  {selectedStory.story_images[0].status === 'approved' && (
+                    <p className="notice">✅ Bildet er godkjent.</p>
+                  )}
+
+                  <button
+                    className="small-btn"
+                    type="button"
+                    onClick={() => generateImagePrompt(selectedStory.id)}
+                    disabled={imageLoadingId === selectedStory.id}
+                  >
+                    {imageLoadingId === selectedStory.id
+                      ? 'Lager nytt bilde...'
+                      : '🔄 Generer nytt bilde'}
+                  </button>
 
                   {selectedStory.story_images[0].prompt && (
                     <p>
@@ -338,17 +402,21 @@ export default function AdminPage() {
                   )}
                 </>
               ) : (
-                <p>Ingen bilde generert ennå.</p>
-              )}
+                <>
+                  <p>Ingen bilde generert ennå.</p>
 
-              <button
-                className="small-btn"
-                type="button"
-                onClick={() => generateImagePrompt(selectedStory.id)}
-                disabled={imageLoadingId === selectedStory.id}
-              >
-                {imageLoadingId === selectedStory.id ? 'Lager bildeprompt...' : '🖼️ Generer bildeprompt'}
-              </button>
+                  <button
+                    className="small-btn"
+                    type="button"
+                    onClick={() => generateImagePrompt(selectedStory.id)}
+                    disabled={imageLoadingId === selectedStory.id}
+                  >
+                    {imageLoadingId === selectedStory.id
+                      ? 'Lager bilde...'
+                      : '🖼️ Generer bilde'}
+                  </button>
+                </>
+              )}
             </div>
 
             <br />
