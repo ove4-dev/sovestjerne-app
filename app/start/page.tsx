@@ -6,8 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 const interests = ['Dyr', 'Magi', 'Verdensrommet', 'Dinosaurer', 'Hester', 'Fotball', 'Eventyr', 'Pirater', 'Prinsesser', 'Havfruer', 'Biler', 'Tog'];
 const personalities = ['Modig', 'Snill', 'Nysgjerrig', 'Kreativ', 'Hjelpsom', 'Eventyrlysten', 'Morsom', 'Rolig'];
 const avoid = ['Skumle ting', 'Mørke skoger', 'Spøkelser', 'Drager', 'Høye lyder', 'Triste avslutninger'];
-
-export default function StartPage() {
+function StartPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
@@ -215,5 +214,13 @@ export default function StartPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function StartPage() {
+  return (
+    <Suspense fallback={<div>Laster...</div>}>
+      <StartPageContent />
+    </Suspense>
   );
 }
