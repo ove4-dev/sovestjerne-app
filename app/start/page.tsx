@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const interests = ['Dyr', 'Magi', 'Verdensrommet', 'Dinosaurer', 'Hester', 'Fotball', 'Eventyr', 'Pirater', 'Prinsesser', 'Havfruer', 'Biler', 'Tog'];
