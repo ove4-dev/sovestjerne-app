@@ -240,7 +240,8 @@ export default function AdminPage() {
       }
 
       setMessage('Bilde ble generert og lagret.');
-      await load();
+await load();
+setSelectedStory(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
     } finally {
@@ -270,7 +271,8 @@ export default function AdminPage() {
       }
 
       setMessage('Bilde ble godkjent.');
-      await load();
+await load();
+setSelectedStory(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kunne ikke godkjenne bilde.');
     } finally {
