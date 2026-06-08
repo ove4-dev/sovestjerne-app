@@ -9,7 +9,18 @@ export default async function StoryPage({ params }: StoryPageProps) {
 
   const { data: story, error } = await supabaseAdmin
     .from('stories')
-    .select('id,title,story_text,chapter_number,created_at,child_id')
+    .select(`
+      id,
+      title,
+      story_text,
+      chapter_number,
+      created_at,
+      child_id,
+      story_images (
+        image_url,
+        status
+      )
+    `)
     .eq('id', id)
     .single();
 
@@ -26,6 +37,10 @@ export default async function StoryPage({ params }: StoryPageProps) {
     );
   }
 
+  const approvedImage = story.story_images?.find(
+    (image) => image.status === 'approved' && image.image_url
+  );
+
   return (
     <main className="page-shell">
       <div className="card">
@@ -39,16 +54,30 @@ export default async function StoryPage({ params }: StoryPageProps) {
         </section>
 
         <section className="story-reader">
+          {approvedImage?.image_url && (
+            <img
+              src={approvedImage.image_url}
+              alt="Illustrasjon til kapittelet"
+              style={{
+                width: '100%',
+                borderRadius: '22px',
+                marginBottom: '28px',
+              }}
+            />
+          )}
+
           <div className="story-text-view">{story.story_text}</div>
-<div style={{ textAlign: 'center', marginTop: '30px' }}>
-  <a
-    href="/foreldre"
-    className="button"
-    style={{ display: 'inline-block', textDecoration: 'none' }}
-  >
-    ← Tilbake til foreldreportalen
-  </a>
-</div>
+
+          <div style={{ textAlign: 'center', marginTop: '30px' }}>
+            <a
+              href="/foreldre"
+              className="button"
+              style={{ display: 'inline-block', textDecoration: 'none' }}
+            >
+              ← Tilbake til foreldreportalen
+            </a>
+          </div>
+
           <div className="story-footer">
             <p>🌙 Neste kapittel kommer snart.</p>
             <p>Sov godt og drøm magisk.</p>
