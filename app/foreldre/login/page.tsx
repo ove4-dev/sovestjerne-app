@@ -23,10 +23,8 @@ export default function ParentLoginPage() {
     });
 
     if (error) {
-      setError('Kunne ikke sende innloggingslenke.');
-    } else {
-      setMessage('Sjekk e-posten din. Vi har sendt deg en magisk innloggingslenke.');
-    }
+  setError(`Kunne ikke sende innloggingslenke: ${error.message}`);
+}
 
     setLoading(false);
   }
