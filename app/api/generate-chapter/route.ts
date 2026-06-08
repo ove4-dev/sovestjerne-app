@@ -34,21 +34,67 @@ export async function POST(request: Request) {
     .single();
 
   if (bibleError || !bible) {
-    return NextResponse.json({ error: 'Story Bible mangler. Generer Story Bible først.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Story Bible mangler. Generer Story Bible først.' },
+      { status: 400 }
+    );
   }
 
-  const { data: lastStory } = await supabaseAdmin
+  const { data: previousStories } = await supabaseAdmin
     .from('stories')
-    .select('chapter_number, summary')
+    .select('chapter_number, title, summary')
     .eq('child_id', childId)
     .order('chapter_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(6);
 
+  const chronologicalStories = [...(previousStories || [])].reverse();
+  const lastStory = chronologicalStories[chronologicalStories.length - 1];
   const nextChapter = (lastStory?.chapter_number || 0) + 1;
 
+  const historyText =
+    chronologicalStories.length > 0
+      ? chronologicalStories
+          .map(
+            (story) =>
+              `Kapittel ${story.chapter_number}: ${
+                story.title || 'Uten tittel'
+              }\nOppsummering: ${story.summary || ''}`
+          )
+          .join('\n\n')
+      : 'Dette er første kapittel.';
+
+  const { data: storyElements } = await supabaseAdmin
+    .from('story_elements')
+    .select('type, role, name, description, details')
+    .eq('child_id', childId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true });
+
+  const elementsText =
+    storyElements && storyElements.length > 0
+      ? storyElements
+          .map((element) => {
+            const details =
+              element.details && Object.keys(element.details).length > 0
+                ? ` Detaljer: ${JSON.stringify(element.details)}`
+                : '';
+
+            return `- Type: ${element.type}. Rolle: ${
+              element.role || '-'
+            }. Navn: ${element.name || '-'}. Beskrivelse: ${
+              element.description || '-'
+            }.${details}`;
+          })
+          .join('\n')
+      : 'Ingen ekstra elementer lagt til ennå.';
+
   const prompt = `
-Skriv et nytt kapittel i en personlig godnatthistorie-serie.
+Du skriver kapittel ${nextChapter} i en personlig godnatthistorie-serie.
+
+VIKTIG:
+Dette er IKKE en enkeltstående historie.
+Dette er neste episode i samme serie.
+Historien må føles som en naturlig fortsettelse av tidligere kapitler.
 
 Barn:
 Navn: ${child.child_name}
@@ -57,35 +103,91 @@ Favorittdyr: ${child.favorite_animal || ''}
 Favorittfarge: ${child.favorite_color || ''}
 Interesser: ${child.interests || ''}
 Personlighet: ${child.personality || ''}
-Ting å unngå: ${child.things_to_avoid || ''}
 Drømmer: ${child.dreams || ''}
 
 Story Bible:
 Univers: ${bible.universe_name}
 Hovedperson: ${bible.main_character}
-Følgesvenn: ${bible.companion_name} (${bible.companion_type})
-Oppdrag: ${bible.story_goal}
-Minne/historikk: ${bible.memory || ''}
+Fast følgesvenn: ${bible.companion_name} (${bible.companion_type})
+Langtidsoppdrag: ${bible.story_goal}
+Minne/historikk:
+${bible.memory || 'Ingen ekstra minne ennå.'}
 
-Forrige kapittel-oppsummering:
-${lastStory?.summary || 'Dette er første kapittel.'}
+Aktive elementer fra foreldre / barnets verden:
+${elementsText}
 
-Dette er kapittel ${nextChapter}.
+Siste kapitler:
+${historyText}
 
 Regler:
+
 - Skriv på norsk.
-- Barnet skal være hovedpersonen.
-- Historien skal være varm, magisk og trygg.
+- Barnet skal alltid være hovedpersonen.
+- Historien skal være varm, trygg og magisk.
 - Passer som godnatthistorie.
-- Ikke bruk skumle eller voldelige elementer.
-- Lengde: ca. 700–1000 ord.
-- Avslutt rolig, men med en mild forventning til neste kapittel.
+- Lengde ca. 700–1000 ord.
+
+SERIEREGLER:
+
+- Dette er ett kapittel i en lang serie.
+- Hvert kapittel må bygge videre på tidligere kapitler.
+- Hvert kapittel må flytte hovedhistorien fremover.
+- Hvert kapittel må inneholde minst én ny oppdagelse, ledetråd, gjenstand, vennskapsutvikling eller fremgang.
+- Historien må aldri starte på nytt.
+- Historien må aldri føles som første kapittel igjen.
+- Bruk minst én konkret ting fra tidligere kapitler eller serie-minnet.
+- Hvis dette er kapittel 1, skal hovedoppdraget åpnes tydelig.
+- Hvis dette er kapittel 2 eller senere, skal historien fortsette fra det som allerede er etablert.
+
+KARAKTERREGLER:
+
+- Gjenbruk eksisterende karakterer før nye introduseres.
+- Ikke introduser en ny viktig karakter hvis en eksisterende karakter kan fylle rollen.
+- Maks én ny viktig karakter i dette kapittelet.
+- Nye karakterer skal ha en tydelig rolle i hovedhistorien.
+- Følgesvennen skal være den viktigste karakteren etter barnet.
+- Følgesvennen skal ha egen personlighet, varme, humor og meninger.
+- Ikke bytt ut fast følgesvenn.
+- Ikke bytt univers.
+- Bruk familie, venner, kjæledyr eller andre elementer fra "Aktive elementer" naturlig og forsiktig.
+- Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
+- Nye elementer fra foreldre skal flettes gradvis inn. Ikke press alt inn på én gang.
+
+NAVNEREGLER:
+
+- Bruk korte, varme og barnevennlige navn.
+- Foretrekk norske, nordiske eller universelle barnenavn.
+- Unngå navn som virker tilfeldige, rare, komiske eller malplasserte.
+- Ikke bruk navn som virker for voksne, aggressive eller useriøse.
+- Gjenbruk etablerte navn før du lager nye.
+
+TRYGGHETSREGLER:
+
+- Ingen banning.
+- Ingen mobbing.
+- Ingen nedsettende språk.
+- Ingen våpen.
+- Ingen krig.
+- Ingen blod eller skader.
+- Ingen skrekkhistorier.
+- Ingen demoner.
+- Ingen alkohol, tobakk, narkotika eller pengespill.
+- Ingen voksenromantikk.
+- Ingen voldelige eller truende situasjoner.
+
+AVSLUTNING:
+
+- Avslutt rolig.
+- Gi barnet en følelse av trygghet.
+- Lukk dagens lille hendelse.
+- Legg inn en mild forventning til neste kapittel.
 
 Svar KUN som gyldig JSON uten markdown:
 {
   "title": "",
-  "summary": "",
-  "story_text": ""
+  "summary": "Kort oppsummering av akkurat dette kapittelet.",
+  "story_text": "",
+  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere."
 }
 `;
 
@@ -101,14 +203,14 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er en prisvinnende barnebokforfatter som skriver trygge, magiske godnatthistorier. Du svarer alltid med ren JSON når du blir bedt om det.',
+            'Du er hovedforfatter for en sammenhengende norsk barnebokserie. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon og god serie-følelse. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.85,
+      temperature: 0.72,
     }),
   });
 
@@ -167,6 +269,20 @@ Svar KUN som gyldig JSON uten markdown:
       { status: 500 }
     );
   }
+
+  const memoryUpdate = `
+${bible.memory || ''}
+
+Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
+`.trim();
+
+  await supabaseAdmin
+    .from('story_bibles')
+    .update({
+      memory: memoryUpdate,
+      current_chapter: nextChapter,
+    })
+    .eq('id', bible.id);
 
   return NextResponse.json({
     success: true,
