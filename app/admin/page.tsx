@@ -2,6 +2,16 @@
 
 import { FormEvent, useState } from 'react';
 
+type StoryImage = {
+  id: string;
+  prompt: string | null;
+  image_url: string | null;
+  status: string | null;
+  generation_status: string | null;
+  created_at?: string | null;
+  approved_at?: string | null;
+};
+
 type StoryBible = {
   universe_name: string | null;
   companion_name: string | null;
@@ -9,6 +19,8 @@ type StoryBible = {
   story_goal: string | null;
   current_chapter: number | null;
   memory: string | null;
+  visual_style?: string | null;
+  visual_description?: string | null;
 };
 
 type Story = {
@@ -21,6 +33,7 @@ type Story = {
   status: string | null;
   email_status: string | null;
   sent_at: string | null;
+  story_images?: StoryImage[];
 };
 
 type ChildRow = {
@@ -64,7 +77,6 @@ export default function AdminPage() {
       });
 
       const result = await response.json();
-
       if (!response.ok) throw new Error(result.error || 'Feil passord.');
 
       setRows(result.children || []);
@@ -162,7 +174,10 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(result.error || 'Kunne ikke godkjenne historien.');
 
       setMessage('Historien ble godkjent.');
-      setSelectedStory((current) => current && current.id === storyId ? { ...current, status: 'approved' } : current);
+      setSelectedStory((current) =>
+        current && current.id === storyId ? { ...current, status: 'approved' } : current
+      );
+
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
@@ -187,7 +202,12 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(result.error || 'Kunne ikke sende historien.');
 
       setMessage('Historien ble sendt på e-post.');
-      setSelectedStory((current) => current && current.id === storyId ? { ...current, email_status: 'sent', sent_at: new Date().toISOString() } : current);
+      setSelectedStory((current) =>
+        current && current.id === storyId
+          ? { ...current, email_status: 'sent', sent_at: new Date().toISOString() }
+          : current
+      );
+
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Noe gikk galt.');
@@ -249,6 +269,50 @@ export default function AdminPage() {
 
             <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.75 }}>
               {selectedStory.story_text}
+            </div>
+
+            <br />
+
+            <div className="detail-card">
+              <h3>🖼️ Bilde</h3>
+
+              {selectedStory.story_images && selectedStory.story_images.length > 0 ? (
+                <>
+                  <p>
+                    <strong>Status:</strong> {selectedStory.story_images[0].status || '-'} <br />
+                    <strong>Generering:</strong> {selectedStory.story_images[0].generation_status || '-'}
+                  </p>
+
+                  {selectedStory.story_images[0].image_url ? (
+                    <img
+                      src={selectedStory.story_images[0].image_url}
+                      alt="Generert bilde"
+                      style={{
+                        width: '100%',
+                        maxWidth: '420px',
+                        borderRadius: '18px',
+                        display: 'block',
+                        marginTop: '14px',
+                      }}
+                    />
+                  ) : (
+                    <p>Ingen bildefil ennå.</p>
+                  )}
+
+                  {selectedStory.story_images[0].prompt && (
+                    <p>
+                      <strong>Prompt:</strong><br />
+                      <small>{selectedStory.story_images[0].prompt}</small>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p>Ingen bilde generert ennå.</p>
+              )}
+
+              <p className="notice">
+                Bildegenerering og bildegodkjenning kobles på i neste steg.
+              </p>
             </div>
 
             <br />
@@ -318,70 +382,57 @@ export default function AdminPage() {
                       <small>{row.interests || '-'}</small>
                     </td>
 
-                   <td>
-  <strong>{row.subscription_status || 'active'}</strong>
+                    <td>
+                      <strong>{row.subscription_status || 'active'}</strong>
+                      <br />
 
-  <br />
+                      {(() => {
+                        if (!row.next_chapter_date) {
+                          return <span style={{ color: '#999' }}>Ingen dato satt</span>;
+                        }
 
-  {(() => {
-    if (!row.next_chapter_date) {
-      return (
-        <span style={{ color: '#999' }}>
-          Ingen dato satt
-        </span>
-      );
-    }
+                        const nextDate = new Date(row.next_chapter_date);
+                        const today = new Date();
 
-    const nextDate = new Date(row.next_chapter_date);
-    const today = new Date();
+                        nextDate.setHours(0, 0, 0, 0);
+                        today.setHours(0, 0, 0, 0);
 
-    nextDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+                        const diffDays = Math.floor(
+                          (nextDate.getTime() - today.getTime()) /
+                          (1000 * 60 * 60 * 24)
+                        );
 
-    const diffDays = Math.floor(
-      (nextDate.getTime() - today.getTime()) /
-      (1000 * 60 * 60 * 24)
-    );
+                        if (diffDays <= 0) {
+                          return (
+                            <div>
+                              🔴 <strong>Skal ha nytt kapittel i dag</strong>
+                            </div>
+                          );
+                        }
 
-    if (diffDays <= 0) {
-      return (
-        <div>
-          🔴 <strong>Skal ha nytt kapittel i dag</strong>
-        </div>
-      );
-    }
+                        if (diffDays <= 3) {
+                          return <div>🟡 Neste kapittel om {diffDays} dager</div>;
+                        }
 
-    if (diffDays <= 3) {
-      return (
-        <div>
-          🟡 Neste kapittel om {diffDays} dager
-        </div>
-      );
-    }
+                        return <div>🟢 Neste kapittel om {diffDays} dager</div>;
+                      })()}
 
-    return (
-      <div>
-        🟢 Neste kapittel om {diffDays} dager
-      </div>
-    );
-  })()}
+                      <br />
 
-  <br />
+                      Neste dato:
+                      <br />
+                      {row.next_chapter_date
+                        ? new Date(row.next_chapter_date).toLocaleDateString('nb-NO')
+                        : '-'}
 
-  Neste dato:
-  <br />
-  {row.next_chapter_date
-    ? new Date(row.next_chapter_date).toLocaleDateString('nb-NO')
-    : '-'}
+                      <br />
 
-  <br />
-
-  Sist sendt:
-  <br />
-  {row.last_chapter_sent_at
-    ? new Date(row.last_chapter_sent_at).toLocaleDateString('nb-NO')
-    : '-'}
-</td>
+                      Sist sendt:
+                      <br />
+                      {row.last_chapter_sent_at
+                        ? new Date(row.last_chapter_sent_at).toLocaleDateString('nb-NO')
+                        : '-'}
+                    </td>
 
                     <td>
                       {bible ? (
@@ -398,17 +449,23 @@ export default function AdminPage() {
 
                     <td>
                       {stories.length > 0 ? (
-                        stories.map((story) => (
-                          <div key={story.id} style={{ marginBottom: '10px' }}>
-                            <button className="small-btn" type="button" onClick={() => openStory(row, story)}>
-                              Les kapittel {story.chapter_number || '-'}
-                            </button>
-                            <br />
-                            <small>
-                              {story.status || '-'} / {story.email_status || '-'}
-                            </small>
-                          </div>
-                        ))
+                        stories.map((story) => {
+                          const image = story.story_images?.[0];
+
+                          return (
+                            <div key={story.id} style={{ marginBottom: '10px' }}>
+                              <button className="small-btn" type="button" onClick={() => openStory(row, story)}>
+                                Les kapittel {story.chapter_number || '-'}
+                              </button>
+                              <br />
+                              <small>
+                                {story.status || '-'} / {story.email_status || '-'}
+                                <br />
+                                Bilde: {image ? `${image.status || '-'} / ${image.generation_status || '-'}` : 'ingen'}
+                              </small>
+                            </div>
+                          );
+                        })
                       ) : (
                         <span>Ingen kapitler</span>
                       )}
