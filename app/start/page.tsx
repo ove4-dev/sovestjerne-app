@@ -1,7 +1,7 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const interests = ['Dyr', 'Magi', 'Verdensrommet', 'Dinosaurer', 'Hester', 'Fotball', 'Eventyr', 'Pirater', 'Prinsesser', 'Havfruer', 'Biler', 'Tog'];
 const personalities = ['Modig', 'Snill', 'Nysgjerrig', 'Kreativ', 'Hjelpsom', 'Eventyrlysten', 'Morsom', 'Rolig'];
@@ -9,11 +9,43 @@ const avoid = ['Skumle ting', 'Mørke skoger', 'Spøkelser', 'Drager', 'Høye ly
 
 export default function StartPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') || '';
+
+  const [checkingToken, setCheckingToken] = useState(true);
+  const [tokenOk, setTokenOk] = useState(false);
+  const [tokenError, setTokenError] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [selectedPersonality, setSelectedPersonality] = useState<string[]>([]);
   const [selectedAvoid, setSelectedAvoid] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function checkToken() {
+      if (!token) {
+        setTokenOk(false);
+        setTokenError('Denne lenken er ikke gyldig. Kjøp abonnement først.');
+        setCheckingToken(false);
+        return;
+      }
+
+      const response = await fetch(`/api/onboarding-token?token=${encodeURIComponent(token)}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setTokenOk(false);
+        setTokenError(result.error || 'Denne lenken er ikke gyldig.');
+      } else {
+        setTokenOk(true);
+      }
+
+      setCheckingToken(false);
+    }
+
+    checkToken();
+  }, [token]);
 
   function toggle(value: string, list: string[], setList: (v: string[]) => void, max?: number) {
     if (list.includes(value)) {
@@ -31,6 +63,7 @@ export default function StartPage() {
 
     const form = new FormData(event.currentTarget);
     const payload = {
+      token,
       parentEmail: String(form.get('parentEmail') || '').trim(),
       parentName: String(form.get('parentName') || '').trim(),
       childName: String(form.get('childName') || '').trim(),
@@ -59,6 +92,39 @@ export default function StartPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkingToken) {
+    return (
+      <main className="page-shell">
+        <div className="card">
+          <section className="success-box">
+            <h1>Sjekker lenken...</h1>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (!tokenOk) {
+    return (
+      <main className="page-shell">
+        <div className="card">
+          <section className="header">
+            <div className="logo"><span className="star">★</span> Sovestjerne</div>
+            <h1>Lenken er ikke gyldig</h1>
+            <p>{tokenError}</p>
+          </section>
+
+          <section className="success-box">
+            <p>For å starte barnets eventyr må abonnementet kjøpes først.</p>
+            <a className="button" href="https://sovestjerne.no" style={{ display: 'inline-block', textDecoration: 'none' }}>
+              Gå til Sovestjerne
+            </a>
+          </section>
+        </div>
+      </main>
+    );
   }
 
   return (
