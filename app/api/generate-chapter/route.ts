@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
+type SeasonEpisode = {
+  chapter_in_season: number;
+  chapter_title?: string;
+  chapter_goal?: string;
+  key_event?: string;
+  ending_hook?: string;
+};
+
 export async function POST(request: Request) {
   const adminPassword = process.env.ADMIN_PASSWORD;
   const provided = request.headers.get('x-admin-password');
@@ -51,6 +59,46 @@ export async function POST(request: Request) {
   const lastStory = chronologicalStories[chronologicalStories.length - 1];
   const nextChapter = (lastStory?.chapter_number || 0) + 1;
 
+  const seasonNumber = Math.floor((nextChapter - 1) / 8) + 1;
+  const chapterInSeason = ((nextChapter - 1) % 8) + 1;
+
+  let { data: season } = await supabaseAdmin
+    .from('story_seasons')
+    .select('*')
+    .eq('child_id', childId)
+    .eq('season_number', seasonNumber)
+    .maybeSingle();
+
+  if (!season) {
+    const seasonResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.sovestjerne.no'}/api/generate-season`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-password': adminPassword,
+      },
+      body: JSON.stringify({ childId }),
+    });
+
+    if (!seasonResponse.ok) {
+      const result = await seasonResponse.json();
+      return NextResponse.json(
+        { error: result.error || 'Kunne ikke generere sesongplan.' },
+        { status: 500 }
+      );
+    }
+
+    const result = await seasonResponse.json();
+    season = result.season;
+  }
+
+  const outline = Array.isArray(season?.season_outline)
+    ? (season.season_outline as SeasonEpisode[])
+    : [];
+
+  const episodePlan =
+    outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
+    outline[chapterInSeason - 1];
+
   const historyText =
     chronologicalStories.length > 0
       ? chronologicalStories
@@ -89,12 +137,14 @@ export async function POST(request: Request) {
       : 'Ingen ekstra elementer lagt til ennå.';
 
   const prompt = `
-Du skriver kapittel ${nextChapter} i en personlig godnatthistorie-serie.
+Du skriver kapittel ${nextChapter} i en personlig norsk barnebokserie.
+
+Dette er sesong ${seasonNumber}, kapittel ${chapterInSeason} av 8.
 
 VIKTIG:
 Dette er IKKE en enkeltstående historie.
 Dette er neste episode i samme serie.
-Historien må føles som en naturlig fortsettelse av tidligere kapitler.
+Du MÅ følge sesongplanen og dagens kapittelmål.
 
 Barn:
 Navn: ${child.child_name}
@@ -113,31 +163,64 @@ Langtidsoppdrag: ${bible.story_goal}
 Minne/historikk:
 ${bible.memory || 'Ingen ekstra minne ennå.'}
 
+Aktiv sesongplan:
+Sesongtema: ${season?.season_theme || ''}
+Sesongens hovedmål: ${season?.main_quest || bible.story_goal || ''}
+
+Dagens kapittelplan:
+Tittelidé: ${episodePlan?.chapter_title || ''}
+Dagens mål: ${episodePlan?.chapter_goal || ''}
+Nøkkelhendelse: ${episodePlan?.key_event || ''}
+Avslutningskrok: ${episodePlan?.ending_hook || ''}
+
 Aktive elementer fra foreldre / barnets verden:
 ${elementsText}
 
 Siste kapitler:
 ${historyText}
 
-Regler:
+SOVESTJERNE-STIL:
+
+- Skriv som en ekte barnebokforfatter, ikke som en AI-assistent.
+- Vis følelser gjennom handling.
+- Ikke forklar moralen rett ut.
+- Unngå setninger som "Kari lærte at...".
+- Bruk heller varme øyeblikk, små detaljer og dialog.
+- Historien skal ha mer eventyr, mysterium og oppdagelse enn prat om regler.
+- Barnet skal kjenne mestring, nysgjerrighet og trygghet.
+
+KAPITTELSTRUKTUR:
+
+1. Varm åpning.
+2. Fortsettelse fra forrige kapittel.
+3. Dagens mål fra sesongplanen.
+4. Liten utfordring eller undring.
+5. Samarbeid mellom barnet og følgesvennen.
+6. Konkret fremgang i hovedhistorien.
+7. Rolig avslutning.
+8. En mild krok til neste kapittel.
+
+REGLER:
 
 - Skriv på norsk.
 - Barnet skal alltid være hovedpersonen.
-- Historien skal være varm, trygg og magisk.
+- Historien skal være varm, trygg, magisk og barnevennlig.
 - Passer som godnatthistorie.
 - Lengde ca. 700–1000 ord.
+- Dagens mål, nøkkelhendelse og avslutningskrok fra sesongplanen må brukes.
+- Hvis sesongplanen sier at noe skal finnes, oppdages eller forstås, må det faktisk skje i kapittelet.
+- Ikke bruk flere kapitler på samme lille hendelse med mindre sesongplanen krever det.
+- Hvert kapittel må endre noe.
 
 SERIEREGLER:
 
-- Dette er ett kapittel i en lang serie.
-- Hvert kapittel må bygge videre på tidligere kapitler.
-- Hvert kapittel må flytte hovedhistorien fremover.
-- Hvert kapittel må inneholde minst én ny oppdagelse, ledetråd, gjenstand, vennskapsutvikling eller fremgang.
 - Historien må aldri starte på nytt.
 - Historien må aldri føles som første kapittel igjen.
 - Bruk minst én konkret ting fra tidligere kapitler eller serie-minnet.
-- Hvis dette er kapittel 1, skal hovedoppdraget åpnes tydelig.
-- Hvis dette er kapittel 2 eller senere, skal historien fortsette fra det som allerede er etablert.
+- Gjenbruk etablerte steder, figurer og gjenstander.
+- Ikke lag en ny hovedhistorie hvis en allerede finnes.
+- Ikke bytt ut hovedoppdraget midt i serien.
+- Ikke bytt univers.
 
 KARAKTERREGLER:
 
@@ -147,8 +230,9 @@ KARAKTERREGLER:
 - Nye karakterer skal ha en tydelig rolle i hovedhistorien.
 - Følgesvennen skal være den viktigste karakteren etter barnet.
 - Følgesvennen skal ha egen personlighet, varme, humor og meninger.
+- Følgesvennen skal bidra aktivt til løsningen.
 - Ikke bytt ut fast følgesvenn.
-- Ikke bytt univers.
+- Ikke endre navn på følgesvennen. Følgesvennen heter alltid ${bible.companion_name}.
 - Bruk familie, venner, kjæledyr eller andre elementer fra "Aktive elementer" naturlig og forsiktig.
 - Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
 - Nye elementer fra foreldre skal flettes gradvis inn. Ikke press alt inn på én gang.
@@ -177,10 +261,12 @@ TRYGGHETSREGLER:
 
 AVSLUTNING:
 
-- Avslutt rolig.
-- Gi barnet en følelse av trygghet.
-- Lukk dagens lille hendelse.
-- Legg inn en mild forventning til neste kapittel.
+- Dagens lille hendelse skal lukkes.
+- Barnet skal føle trygghet.
+- Kapittelet skal slutte rolig nok for leggetid.
+- Avslutningen skal samtidig gi en mild forventning til neste kapittel.
+- Bruk avslutningskroken fra sesongplanen.
+- Unngå generiske avslutninger som bare sier "de gledet seg til neste dag".
 
 Svar KUN som gyldig JSON uten markdown:
 {
@@ -203,14 +289,14 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er hovedforfatter for en sammenhengende norsk barnebokserie. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon og god serie-følelse. Du svarer alltid med ren JSON.',
+            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.72,
+      temperature: 0.62,
     }),
   });
 
