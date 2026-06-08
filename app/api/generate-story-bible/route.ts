@@ -25,6 +25,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Fant ikke barnet.' }, { status: 404 });
   }
 
+  const { count } = await supabaseAdmin
+    .from('stories')
+    .select('*', {
+      count: 'exact',
+      head: true,
+    })
+    .eq('child_id', childId);
+
+  if ((count || 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Story Bible kan ikke regenereres etter at serien har startet. Bruk Story Elements for nye personer, interesser og hendelser.',
+      },
+      { status: 400 }
+    );
+  }
+
   const prompt = `
 Du lager en Story Bible for et personlig godnatthistorie-univers.
 
@@ -45,7 +63,11 @@ Viktig:
 - Det skal være varmt, trygt og egnet som godnatthistorie.
 - Ikke bruk skumle eller voldelige elementer.
 - Lag en tydelig følgesvenn basert på barnets favorittdyr hvis mulig.
+- Følgesvennen skal aldri bytte navn senere.
 - Lag et oppdrag som kan fortsette uke etter uke.
+- Bruk korte, varme og barnevennlige navn.
+- Foretrekk norske, nordiske eller universelle barnenavn.
+- Unngå tilfeldige, rare eller malplasserte navn.
 
 Svar KUN som gyldig JSON uten markdown:
 {
@@ -69,14 +91,15 @@ Svar KUN som gyldig JSON uten markdown:
       messages: [
         {
           role: 'system',
-          content: 'Du er en ekspert på trygge, magiske godnatthistorier for barn. Du svarer alltid med ren JSON når du blir bedt om det.',
+          content:
+            'Du er en ekspert på trygge, magiske norske godnatthistorier for barn. Du bygger stabile eventyrunivers som kan vare lenge. Du svarer alltid med ren JSON når du blir bedt om det.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.8,
+      temperature: 0.65,
     }),
   });
 
