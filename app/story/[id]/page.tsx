@@ -40,7 +40,15 @@ export default async function StoryPage({ params }: StoryPageProps) {
 
         <section className="story-reader">
           <div className="story-text-view">{story.story_text}</div>
-
+<div style={{ textAlign: 'center', marginTop: '30px' }}>
+  <a
+    href="/foreldre"
+    className="button"
+    style={{ display: 'inline-block', textDecoration: 'none' }}
+  >
+    ← Tilbake til foreldreportalen
+  </a>
+</div>
           <div className="story-footer">
             <p>🌙 Neste kapittel kommer snart.</p>
             <p>Sov godt og drøm magisk.</p>
