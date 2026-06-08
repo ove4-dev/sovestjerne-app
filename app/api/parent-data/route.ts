@@ -2,20 +2,13 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.replace('Bearer ', '');
+  const cookieHeader = request.headers.get('cookie') || '';
+  const match = cookieHeader.match(/parent_email=([^;]+)/);
+  const email = match ? decodeURIComponent(match[1]).toLowerCase() : '';
 
-  if (!token) {
+  if (!email) {
     return NextResponse.json({ error: 'Ikke innlogget.' }, { status: 401 });
   }
-
-  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-  if (userError || !userData.user?.email) {
-    return NextResponse.json({ error: 'Ugyldig innlogging.' }, { status: 401 });
-  }
-
-  const email = userData.user.email.toLowerCase();
 
   const { data: parent } = await supabaseAdmin
     .from('parents')
@@ -32,10 +25,6 @@ export async function GET(request: Request) {
     .select(`
       id,
       child_name,
-      child_age,
-      favorite_animal,
-      favorite_color,
-      interests,
       next_chapter_date,
       subscription_status,
       stories (
