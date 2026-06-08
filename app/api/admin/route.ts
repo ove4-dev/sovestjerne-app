@@ -35,7 +35,9 @@ export async function GET(request: Request) {
         companion_type,
         story_goal,
         current_chapter,
-        memory
+        memory,
+        visual_style,
+        visual_description
       ),
       stories (
         id,
@@ -46,7 +48,16 @@ export async function GET(request: Request) {
         summary,
         status,
         email_status,
-        sent_at
+        sent_at,
+        story_images (
+          id,
+          prompt,
+          image_url,
+          status,
+          generation_status,
+          created_at,
+          approved_at
+        )
       )
     `)
     .order('created_at', { ascending: false });
