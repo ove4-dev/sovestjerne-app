@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
   const { data: previousStories } = await supabaseAdmin
     .from('stories')
-    .select('chapter_number, title, summary')
+    .select('chapter_number, title, summary, story_text')
     .eq('child_id', childId)
     .order('chapter_number', { ascending: false })
     .limit(6);
@@ -118,15 +118,24 @@ export async function POST(request: Request) {
     outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
     outline[chapterInSeason - 1];
 
-  const historyText =
-    chronologicalStories.length > 0
-      ? chronologicalStories
-          .map(
-            (story) =>
-              `Kapittel ${story.chapter_number}: ${
-                story.title || 'Uten tittel'
-              }\nOppsummering: ${story.summary || ''}`
-          )
+const historyText =
+  chronologicalStories.length > 0
+    ? chronologicalStories
+        .map(
+          (story) =>
+            `Kapittel ${story.chapter_number}: ${
+              story.title || 'Uten tittel'
+            }
+
+Oppsummering:
+${story.summary || ''}
+
+Tekstutdrag:
+${(story.story_text || '').slice(0, 1200)}
+`
+        )
+        .join('\n\n')
+    : 'Dette er første kapittel.';
           .join('\n\n')
       : 'Dette er første kapittel.';
 
