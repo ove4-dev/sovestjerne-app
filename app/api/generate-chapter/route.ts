@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { createStoryStyle } from '../../../lib/story-style-engine';
 
 type SeasonEpisode = {
   chapter_in_season: number;
@@ -117,6 +118,16 @@ export async function POST(request: Request) {
   const episodePlan =
     outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
     outline[chapterInSeason - 1];
+
+  const storyStyle = createStoryStyle({
+    childName: child.child_name,
+    interests: child.interests,
+    favoriteAnimal: child.favorite_animal,
+    favoritePlace: child.favorite_place,
+    favoriteColor: child.favorite_color,
+    seasonTheme: season?.season_theme,
+    mainQuest: season?.main_quest || bible.story_goal,
+  });
 
   const historyText =
     chronologicalStories.length > 0
@@ -257,6 +268,20 @@ ${charactersText}
 Siste kapitler:
 ${historyText}
 
+PERSONLIG HISTORIESTIL:
+
+Foreslått åpning:
+${storyStyle.opening}
+
+Foreslått avslutning:
+${storyStyle.ending}
+
+Dagens mysterium:
+${storyStyle.mysteryStyle}
+
+Forfatterinstruksjoner:
+${storyStyle.authorInstructions.join('\n')}
+
 SOVESTJERNE-STIL:
 
 - Skriv som en ekte barnebokforfatter, ikke som en AI-assistent.
@@ -272,13 +297,13 @@ SOVESTJERNE-STIL:
 
 KAPITTELSTRUKTUR:
 
-1. Varm åpning.
+1. Bruk den foreslåtte åpningen som inspirasjon.
 2. Fortsettelse fra forrige kapittel.
 3. Dagens mål fra sesongplanen.
 4. Liten utfordring eller undring.
 5. Samarbeid mellom barnet og følgesvennen.
 6. Konkret fremgang i hovedhistorien.
-7. Rolig avslutning.
+7. Bruk den foreslåtte avslutningen som inspirasjon.
 8. En mild krok til neste kapittel.
 
 REGLER:
@@ -358,6 +383,7 @@ AVSLUTNING:
 - Kapittelet skal slutte rolig nok for leggetid.
 - Avslutningen skal samtidig gi en mild forventning til neste kapittel.
 - Bruk avslutningskroken fra sesongplanen.
+- Bruk den foreslåtte avslutningen som inspirasjon.
 - Unngå generiske avslutninger som bare sier "de gledet seg til neste dag".
 
 Svar KUN som gyldig JSON uten markdown:
@@ -397,7 +423,7 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen, story_state og eksisterende karakterer. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
+            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, variasjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
