@@ -66,7 +66,15 @@ export default async function StoryPage({ params }: StoryPageProps) {
             />
           )}
 
-          <div className="story-text-view">{story.story_text}</div>
+          <div
+  className="story-text-view"
+  style={{
+    whiteSpace: 'pre-line',
+    lineHeight: 1.9,
+  }}
+>
+  {story.story_text}
+</div>
 
           <div style={{ textAlign: 'center', marginTop: '30px' }}>
             <a
