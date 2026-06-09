@@ -16,15 +16,137 @@ function clean(value?: string | null) {
   return value?.trim() || '';
 }
 
+function createInterestHooks(interest: string) {
+  const lower = interest.toLowerCase();
+
+  if (lower.includes('bil')) {
+    return {
+      openings: [
+        'Noe merkelig hadde skjedd ved den gamle racerbanen.',
+        'Et ukjent hjulspor dukket opp i bakken.',
+        'Følgesvennen fant en glitrende bildel ingen hadde sett før.',
+        'En mystisk garasje hadde plutselig dukket opp på kartet.'
+      ],
+      mysteries: [
+        'den forsvunne racernøkkelen',
+        'den hemmelige motorhulen',
+        'det gylne kartet til racerbanen'
+      ]
+    };
+  }
+
+  if (lower.includes('båt') || lower.includes('hav')) {
+    return {
+      openings: [
+        'Et merkelig lys blinket ute på vannet.',
+        'Noen hadde fortøyd en ukjent båt ved brygga.',
+        'Følgesvennen fant et gammelt sjøkart.',
+        'Bølgene bar med seg en hemmelig melding.'
+      ],
+      mysteries: [
+        'fyrlykten som forsvant',
+        'kapteinens hemmelige kart',
+        'de syv havnøklene'
+      ]
+    };
+  }
+
+  if (lower.includes('dinosaur')) {
+    return {
+      openings: [
+        'Et enormt fotspor hadde dukket opp i sanden.',
+        'Noen hadde sett noe bevege seg ved dinosaurdalen.',
+        'Følgesvennen fant et merkelig fossil.',
+        'Et gammelt kart pekte mot de tapte dinosaurfjellene.'
+      ],
+      mysteries: [
+        'det glemte fossilet',
+        'de tapte dinosaurfjellene',
+        'egget som glødet om natten'
+      ]
+    };
+  }
+
+  if (lower.includes('fotball')) {
+    return {
+      openings: [
+        'En fotball lå midt på stien uten at noen visste hvorfor.',
+        'Noen hadde tegnet et merkelig symbol på fotballbanen.',
+        'Et gammelt trofé glitret i solen.',
+        'Følgesvennen fant et spor ved målstreken.'
+      ],
+      mysteries: [
+        'det forsvunne troféet',
+        'den hemmelige banen',
+        'den gylne fotballen'
+      ]
+    };
+  }
+
+  if (lower.includes('hest')) {
+    return {
+      openings: [
+        'Et nytt hovspor hadde dukket opp ved stallen.',
+        'En hvit hest stod plutselig på engen.',
+        'Følgesvennen fant en merkelig hestesko.',
+        'Noen hadde flettet blomster i gjerdet.'
+      ],
+      mysteries: [
+        'den forsvunne hesteskoen',
+        'engen med sølvgress',
+        'den hemmelige rideveien'
+      ]
+    };
+  }
+
+  if (
+    lower.includes('rom') ||
+    lower.includes('planet') ||
+    lower.includes('stjerne')
+  ) {
+    return {
+      openings: [
+        'En ny stjerne blinket på himmelen.',
+        'Kartet viste plutselig en ukjent planet.',
+        'Et svakt lys kom fra verdensrommet.',
+        'Følgesvennen oppdaget et stjernespor.'
+      ],
+      mysteries: [
+        'den tapte stjerneporten',
+        'planeten ingen hadde besøkt',
+        'det syngende stjernekartet'
+      ]
+    };
+  }
+
+  return {
+    openings: [],
+    mysteries: []
+  };
+}
+
 export function createStoryStyle(input: StoryStyleInput) {
   const childName = clean(input.childName) || 'barnet';
-  const interests = clean(input.interests) || 'eventyr';
+
+  const interestsList = (input.interests || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const primaryInterest =
+    interestsList[Math.floor(Math.random() * interestsList.length)] ||
+    'eventyr';
+
   const animal = clean(input.favoriteAnimal) || 'følgesvennen';
   const place = clean(input.favoritePlace) || 'et magisk sted';
   const color = clean(input.favoriteColor) || 'gyllen';
   const quest = clean(input.mainQuest) || 'det store mysteriet';
 
+  const interestData = createInterestHooks(primaryInterest);
+
   const openings = [
+    ...interestData.openings,
+
     `${childName} la merke til noe merkelig ved ${place}.`,
     `Det var noe annerledes med ${place} denne gangen.`,
     `${animal} stoppet plutselig og lyttet.`,
@@ -51,7 +173,11 @@ export function createStoryStyle(input: StoryStyleInput) {
   ];
 
   const mysteryStyles = [
-    `Bruk et mysterium knyttet til ${interests}.`,
+    ...interestData.mysteries.map(
+      (m) => `La dagens mysterium handle om ${m}.`
+    ),
+
+    `Bruk et mysterium knyttet til ${primaryInterest}.`,
     `La en ledetråd dukke opp gjennom ${animal}.`,
     `La ${place} skjule noe nytt.`,
     `La ${color} være en viktig detalj.`,
@@ -64,9 +190,11 @@ export function createStoryStyle(input: StoryStyleInput) {
     'Vis følelser gjennom handling, ikke forklar moralen direkte.',
     'Varier åpning og avslutning fra tidligere kapitler.',
     'Bruk sanser: lyd, lys, lukt, bevegelse og små detaljer.',
-    'La følgesvennen bidra aktivt, ikke bare bjeffe, nikke eller logre.',
-    'Gi kapittelet en konkret oppdagelse, ikke bare prat.',
-    'Unngå generiske formuleringer som “de gledet seg til neste eventyr”.'
+    'La følgesvennen bidra aktivt.',
+    'Gi kapittelet en konkret oppdagelse.',
+    'Unngå generiske formuleringer som "de gledet seg til neste eventyr".',
+    'Bruk dialog naturlig.',
+    'La historien føles som et ekte bokkapittel.'
   ];
 
   return {
