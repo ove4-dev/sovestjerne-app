@@ -144,6 +144,13 @@ ${(story.story_text || '').slice(0, 1200)}
     .eq('is_active', true)
     .order('created_at', { ascending: true });
 
+  const { data: storyCharacters } = await supabaseAdmin
+  .from('story_characters')
+  .select('*')
+  .eq('child_id', childId)
+  .eq('is_active', true)
+  .order('last_seen_chapter', { ascending: false });
+
   const elementsText =
     storyElements && storyElements.length > 0
       ? storyElements
