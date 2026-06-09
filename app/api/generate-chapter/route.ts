@@ -159,6 +159,19 @@ ${(story.story_text || '').slice(0, 1200)}
               element.details && Object.keys(element.details).length > 0
                 ? ` Detaljer: ${JSON.stringify(element.details)}`
                 : '';
+            const charactersText =
+  storyCharacters && storyCharacters.length > 0
+    ? storyCharacters
+        .map(
+          (c) => `
+Navn: ${c.name}
+Rolle: ${c.role || ''}
+Personlighet: ${c.personality || ''}
+Beskrivelse: ${c.description || ''}
+`
+        )
+        .join('\n')
+    : 'Ingen registrerte karakterer ennå.';
 
             return `- Type: ${element.type}. Rolle: ${
               element.role || '-'
@@ -238,7 +251,15 @@ Avslutningskrok: ${episodePlan?.ending_hook || ''}
 
 Aktive elementer fra foreldre / barnets verden:
 ${elementsText}
+Eksisterende karakterer:
+${charactersText}
 
+KARAKTER-KONTINUITET:
+
+- Bruk eksisterende karakterer før du lager nye.
+- Hvis en karakter allerede finnes, behold navn, rolle og personlighet.
+- Ikke introduser mer enn én ny viktig karakter i dette kapittelet.
+- Følgesvennen ${bible.companion_name} er alltid den viktigste karakteren etter barnet.
 Siste kapitler:
 ${historyText}
 
