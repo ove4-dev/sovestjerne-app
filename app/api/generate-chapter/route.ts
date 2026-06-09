@@ -136,8 +136,6 @@ ${(story.story_text || '').slice(0, 1200)}
         )
         .join('\n\n')
     : 'Dette er første kapittel.';
-          .join('\n\n')
-      : 'Dette er første kapittel.';
 
   const { data: storyElements } = await supabaseAdmin
     .from('story_elements')
