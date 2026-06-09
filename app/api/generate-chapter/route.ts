@@ -9,6 +9,16 @@ type SeasonEpisode = {
   ending_hook?: string;
 };
 
+function asArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(String).filter(Boolean);
+}
+
+function mergeUnique(oldItems: unknown, newItems: unknown): string[] {
+  const combined = [...asArray(oldItems), ...asArray(newItems)];
+  return Array.from(new Set(combined.map((item) => item.trim()).filter(Boolean)));
+}
+
 export async function POST(request: Request) {
   const adminPassword = process.env.ADMIN_PASSWORD;
   const provided = request.headers.get('x-admin-password');
@@ -48,6 +58,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: state } = await supabaseAdmin
+    .from('story_state')
+    .select('*')
+    .eq('child_id', childId)
+    .maybeSingle();
+
   const { data: previousStories } = await supabaseAdmin
     .from('stories')
     .select('chapter_number, title, summary')
@@ -70,14 +86,17 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!season) {
-    const seasonResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.sovestjerne.no'}/api/generate-season`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-password': adminPassword,
-      },
-      body: JSON.stringify({ childId }),
-    });
+    const seasonResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.sovestjerne.no'}/api/generate-season`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': adminPassword,
+        },
+        body: JSON.stringify({ childId }),
+      }
+    );
 
     if (!seasonResponse.ok) {
       const result = await seasonResponse.json();
@@ -136,6 +155,26 @@ export async function POST(request: Request) {
           .join('\n')
       : 'Ingen ekstra elementer lagt til ennå.';
 
+  const stateText = `
+Aktivt mål:
+${state?.active_goal || 'Ingen aktivt mål lagret ennå.'}
+
+Fullførte mål:
+${asArray(state?.completed_goals).join(', ') || 'Ingen'}
+
+Ting som allerede er funnet:
+${asArray(state?.found_items).join(', ') || 'Ingen'}
+
+Kjente steder:
+${asArray(state?.known_places).join(', ') || 'Ingen'}
+
+Kjente karakterer:
+${asArray(state?.known_characters).join(', ') || 'Ingen'}
+
+Åpne mysterier:
+${asArray(state?.open_mysteries).join(', ') || 'Ingen'}
+`;
+
   const prompt = `
 Du skriver kapittel ${nextChapter} i en personlig norsk barnebokserie.
 
@@ -162,6 +201,16 @@ Fast følgesvenn: ${bible.companion_name} (${bible.companion_type})
 Langtidsoppdrag: ${bible.story_goal}
 Minne/historikk:
 ${bible.memory || 'Ingen ekstra minne ennå.'}
+
+STORY STATE:
+${stateText}
+
+VIKTIGE STATE-REGLER:
+- Ikke la barnet finne en gjenstand som allerede står under "Ting som allerede er funnet".
+- Ikke la barnet fullføre et mål som allerede står under "Fullførte mål".
+- Ikke gjenta samme gjennombrudd fra tidligere kapitler.
+- Bruk "Åpne mysterier" til å skape fremdrift.
+- Oppdater state_update tydelig etter kapittelet.
 
 Aktiv sesongplan:
 Sesongtema: ${season?.season_theme || ''}
@@ -273,7 +322,15 @@ Svar KUN som gyldig JSON uten markdown:
   "title": "",
   "summary": "Kort oppsummering av akkurat dette kapittelet.",
   "story_text": "",
-  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere."
+  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere.",
+  "state_update": {
+    "active_goal": "",
+    "completed_goals": [],
+    "found_items": [],
+    "known_places": [],
+    "known_characters": [],
+    "open_mysteries": []
+  }
 }
 `;
 
@@ -289,14 +346,14 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
+            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen og story_state. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.62,
+      temperature: 0.58,
     }),
   });
 
@@ -369,6 +426,33 @@ Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
       current_chapter: nextChapter,
     })
     .eq('id', bible.id);
+
+  const update = chapter.state_update || {};
+
+  const nextState = {
+    active_goal: update.active_goal || state?.active_goal || episodePlan?.chapter_goal || '',
+    completed_goals: mergeUnique(state?.completed_goals, update.completed_goals),
+    found_items: mergeUnique(state?.found_items, update.found_items),
+    known_places: mergeUnique(state?.known_places, update.known_places),
+    known_characters: mergeUnique(state?.known_characters, update.known_characters),
+    open_mysteries: mergeUnique(state?.open_mysteries, update.open_mysteries),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (state?.id) {
+    await supabaseAdmin
+      .from('story_state')
+      .update(nextState)
+      .eq('id', state.id);
+  } else {
+    await supabaseAdmin
+      .from('story_state')
+      .insert({
+        child_id: childId,
+        ...nextState,
+        created_at: new Date().toISOString(),
+      });
+  }
 
   return NextResponse.json({
     success: true,
