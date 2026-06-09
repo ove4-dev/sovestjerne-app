@@ -118,14 +118,12 @@ export async function POST(request: Request) {
     outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
     outline[chapterInSeason - 1];
 
-const historyText =
-  chronologicalStories.length > 0
-    ? chronologicalStories
-        .map(
-          (story) =>
-            `Kapittel ${story.chapter_number}: ${
-              story.title || 'Uten tittel'
-            }
+  const historyText =
+    chronologicalStories.length > 0
+      ? chronologicalStories
+          .map(
+            (story) =>
+              `Kapittel ${story.chapter_number}: ${story.title || 'Uten tittel'}
 
 Oppsummering:
 ${story.summary || ''}
@@ -133,9 +131,9 @@ ${story.summary || ''}
 Tekstutdrag:
 ${(story.story_text || '').slice(0, 1200)}
 `
-        )
-        .join('\n\n')
-    : 'Dette er første kapittel.';
+          )
+          .join('\n\n')
+      : 'Dette er første kapittel.';
 
   const { data: storyElements } = await supabaseAdmin
     .from('story_elements')
@@ -145,11 +143,11 @@ ${(story.story_text || '').slice(0, 1200)}
     .order('created_at', { ascending: true });
 
   const { data: storyCharacters } = await supabaseAdmin
-  .from('story_characters')
-  .select('*')
-  .eq('child_id', childId)
-  .eq('is_active', true)
-  .order('last_seen_chapter', { ascending: false });
+    .from('story_characters')
+    .select('*')
+    .eq('child_id', childId)
+    .eq('is_active', true)
+    .order('last_seen_chapter', { ascending: false });
 
   const elementsText =
     storyElements && storyElements.length > 0
@@ -159,19 +157,6 @@ ${(story.story_text || '').slice(0, 1200)}
               element.details && Object.keys(element.details).length > 0
                 ? ` Detaljer: ${JSON.stringify(element.details)}`
                 : '';
-            const charactersText =
-  storyCharacters && storyCharacters.length > 0
-    ? storyCharacters
-        .map(
-          (c) => `
-Navn: ${c.name}
-Rolle: ${c.role || ''}
-Personlighet: ${c.personality || ''}
-Beskrivelse: ${c.description || ''}
-`
-        )
-        .join('\n')
-    : 'Ingen registrerte karakterer ennå.';
 
             return `- Type: ${element.type}. Rolle: ${
               element.role || '-'
@@ -181,6 +166,20 @@ Beskrivelse: ${c.description || ''}
           })
           .join('\n')
       : 'Ingen ekstra elementer lagt til ennå.';
+
+  const charactersText =
+    storyCharacters && storyCharacters.length > 0
+      ? storyCharacters
+          .map(
+            (c) => `
+Navn: ${c.name}
+Rolle: ${c.role || ''}
+Personlighet: ${c.personality || ''}
+Beskrivelse: ${c.description || ''}
+`
+          )
+          .join('\n')
+      : 'Ingen registrerte karakterer ennå.';
 
   const stateText = `
 Aktivt mål:
@@ -210,7 +209,7 @@ Dette er sesong ${seasonNumber}, kapittel ${chapterInSeason} av 8.
 VIKTIG:
 Dette er IKKE en enkeltstående historie.
 Dette er neste episode i samme serie.
-Du MÅ følge sesongplanen og dagens kapittelmål.
+Du MÅ følge sesongplanen, dagens kapittelmål og story_state.
 
 Barn:
 Navn: ${child.child_name}
@@ -251,15 +250,10 @@ Avslutningskrok: ${episodePlan?.ending_hook || ''}
 
 Aktive elementer fra foreldre / barnets verden:
 ${elementsText}
+
 Eksisterende karakterer:
 ${charactersText}
 
-KARAKTER-KONTINUITET:
-
-- Bruk eksisterende karakterer før du lager nye.
-- Hvis en karakter allerede finnes, behold navn, rolle og personlighet.
-- Ikke introduser mer enn én ny viktig karakter i dette kapittelet.
-- Følgesvennen ${bible.companion_name} er alltid den viktigste karakteren etter barnet.
 Siste kapitler:
 ${historyText}
 
@@ -272,6 +266,9 @@ SOVESTJERNE-STIL:
 - Bruk heller varme øyeblikk, små detaljer og dialog.
 - Historien skal ha mer eventyr, mysterium og oppdagelse enn prat om regler.
 - Barnet skal kjenne mestring, nysgjerrighet og trygghet.
+- Del story_text inn i tydelige avsnitt.
+- Bruk blank linje mellom avsnitt.
+- Dialog skal ofte stå på egen linje.
 
 KAPITTELSTRUKTUR:
 
@@ -309,6 +306,7 @@ SERIEREGLER:
 KARAKTERREGLER:
 
 - Gjenbruk eksisterende karakterer før nye introduseres.
+- Hvis en karakter allerede finnes, behold navn, rolle og personlighet.
 - Ikke introduser en ny viktig karakter hvis en eksisterende karakter kan fylle rollen.
 - Maks én ny viktig karakter i dette kapittelet.
 - Nye karakterer skal ha en tydelig rolle i hovedhistorien.
@@ -320,6 +318,16 @@ KARAKTERREGLER:
 - Bruk familie, venner, kjæledyr eller andre elementer fra "Aktive elementer" naturlig og forsiktig.
 - Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
 - Nye elementer fra foreldre skal flettes gradvis inn. Ikke press alt inn på én gang.
+
+KRITISK NAVNELÅS:
+
+Følgesvennen heter alltid ${bible.companion_name}.
+
+Du har ikke lov til å gi følgesvennen et nytt navn.
+
+Hvis du bruker et annet navn enn ${bible.companion_name}, er kapittelet feil.
+
+Før du svarer skal du kontrollere at følgesvennen kun omtales som ${bible.companion_name}.
 
 NAVNEREGLER:
 
@@ -365,7 +373,15 @@ Svar KUN som gyldig JSON uten markdown:
     "known_places": [],
     "known_characters": [],
     "open_mysteries": []
-  }
+  },
+  "character_updates": [
+    {
+      "name": "",
+      "role": "",
+      "personality": "",
+      "description": ""
+    }
+  ]
 }
 `;
 
@@ -381,14 +397,14 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen og story_state. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
+            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen, story_state og eksisterende karakterer. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.58,
+      temperature: 0.56,
     }),
   });
 
@@ -422,6 +438,21 @@ Svar KUN som gyldig JSON uten markdown:
       },
       { status: 500 }
     );
+  }
+
+  const correctCompanionName = bible.companion_name;
+  const wrongCompanionNames = ['Bobby', 'Max', 'Milo', 'Nova'];
+
+  for (const wrongName of wrongCompanionNames) {
+    if (wrongName !== correctCompanionName) {
+      chapter.story_text = chapter.story_text?.replaceAll(wrongName, correctCompanionName);
+      chapter.summary = chapter.summary?.replaceAll(wrongName, correctCompanionName);
+      chapter.title = chapter.title?.replaceAll(wrongName, correctCompanionName);
+      chapter.continuity_update = chapter.continuity_update?.replaceAll(
+        wrongName,
+        correctCompanionName
+      );
+    }
   }
 
   const { data, error } = await supabaseAdmin
@@ -487,6 +518,48 @@ Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
         ...nextState,
         created_at: new Date().toISOString(),
       });
+  }
+
+  const characterUpdates = Array.isArray(chapter.character_updates)
+    ? chapter.character_updates
+    : [];
+
+  for (const character of characterUpdates) {
+    if (!character.name) continue;
+
+    const { data: existingCharacter } = await supabaseAdmin
+      .from('story_characters')
+      .select('id')
+      .eq('child_id', childId)
+      .eq('name', character.name)
+      .maybeSingle();
+
+    if (existingCharacter) {
+      await supabaseAdmin
+        .from('story_characters')
+        .update({
+          role: character.role || '',
+          personality: character.personality || '',
+          description: character.description || '',
+          last_seen_chapter: nextChapter,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingCharacter.id);
+    } else {
+      await supabaseAdmin
+        .from('story_characters')
+        .insert({
+          child_id: childId,
+          name: character.name,
+          role: character.role || '',
+          personality: character.personality || '',
+          description: character.description || '',
+          first_chapter: nextChapter,
+          last_seen_chapter: nextChapter,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+    }
   }
 
   return NextResponse.json({
