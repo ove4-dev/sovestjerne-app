@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 import { createStoryStyle } from '../../../lib/story-style-engine';
+import { getStoryStyleBank } from '../../../lib/story-style-bank';
 
 type SeasonEpisode = {
   chapter_in_season: number;
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
     favoriteColor: child.favorite_color,
     seasonTheme: season?.season_theme,
     mainQuest: season?.main_quest || bible.story_goal,
+    const styleBank = await getStoryStyleBank();
   });
 
   const historyText =
@@ -285,6 +287,22 @@ Siste kapitler:
 ${historyText}
 
 PERSONLIG HISTORIESTIL:
+EKSTRA STILBANK:
+
+Åpningstype:
+${styleBank.opening?.content || ''}
+
+Avslutningstype:
+${styleBank.ending?.content || ''}
+
+Mysterietype:
+${styleBank.mystery?.content || ''}
+
+Dialogregel:
+${styleBank.dialog?.content || ''}
+
+Twist:
+${styleBank.twist?.content || ''}
 
 Foreslått åpning:
 ${storyStyle.opening}
@@ -299,6 +317,14 @@ Forfatterinstruksjoner:
 ${storyStyle.authorInstructions.join('\n')}
 
 SOVESTJERNE-STIL:
+
+STILBANKREGLER:
+
+- Bruk stilbanken som inspirasjon.
+- Ikke kopier formuleringene direkte.
+- Varier mot de siste kapitlene.
+- Hvis åpningen ligner på et nylig kapittel, bruk en annen åpning.
+- Hvis avslutningen ligner på et nylig kapittel, bruk en annen avslutning.
 
 FORBUDTE AI-MØNSTRE:
 - Ikke start flere kapitler på rad med samme type åpning.
