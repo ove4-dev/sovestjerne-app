@@ -120,15 +120,16 @@ export async function POST(request: Request) {
     outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
     outline[chapterInSeason - 1];
 
-  const storyStyle = createStoryStyle({
-    childName: child.child_name,
-    interests: child.interests,
-    favoriteAnimal: child.favorite_animal,
-    favoritePlace: child.favorite_place,
-    favoriteColor: child.favorite_color,
-    seasonTheme: season?.season_theme,
-    mainQuest: season?.main_quest || bible.story_goal,
-  });
+const storyStyle = createStoryStyle({
+  childName: child.child_name,
+  companionName: bible.companion_name,
+  interests: child.interests,
+  favoriteAnimal: child.favorite_animal,
+  favoritePlace: child.favorite_place,
+  favoriteColor: child.favorite_color,
+  seasonTheme: season?.season_theme,
+  mainQuest: season?.main_quest || bible.story_goal,
+});
 
   const styleBank = await getStoryStyleBank();
 
