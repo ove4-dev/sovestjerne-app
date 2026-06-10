@@ -1,6 +1,30 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
+function cleanJson(text: string) {
+  return text
+    .trim()
+    .replace(/^```json/i, '')
+    .replace(/^```/i, '')
+    .replace(/```$/i, '')
+    .trim();
+}
+
+function fallbackCompanionName(favoriteAnimal?: string | null) {
+  const animal = (favoriteAnimal || '').toLowerCase();
+
+  if (animal.includes('hund')) return 'Turbo';
+  if (animal.includes('katt')) return 'Milo';
+  if (animal.includes('hest')) return 'Luna';
+  if (animal.includes('delfin')) return 'Delfi';
+  if (animal.includes('dinosaur')) return 'Dino';
+  if (animal.includes('papegøye')) return 'Pico';
+  if (animal.includes('rev')) return 'Foxy';
+  if (animal.includes('kanin')) return 'Ninni';
+
+  return 'Stella';
+}
+
 export async function POST(request: Request) {
   const adminPassword = process.env.ADMIN_PASSWORD;
   const provided = request.headers.get('x-admin-password');
@@ -27,65 +51,71 @@ export async function POST(request: Request) {
 
   const { count } = await supabaseAdmin
     .from('stories')
-    .select('*', {
-      count: 'exact',
-      head: true,
-    })
+    .select('*', { count: 'exact', head: true })
     .eq('child_id', childId);
 
   if ((count || 0) > 0) {
     return NextResponse.json(
       {
         error:
-          'Story Bible kan ikke regenereres etter at serien har startet. Bruk Story Elements for nye personer, interesser og hendelser.',
+          'Story Bible er låst fordi barnet allerede har kapitler. Slett kapitlene først hvis du vil lage ny Story Bible.',
       },
       { status: 400 }
     );
   }
 
+  const childName = child.child_name;
+
   const prompt = `
-Du lager en Story Bible for et personlig godnatthistorie-univers.
+Du lager en Story Bible for en personlig norsk barnebokserie.
+
+KRITISK NAVNELÅS:
+- Barnets navn er: ${childName}
+- Hovedpersonen SKAL alltid hete: ${childName}
+- Du har IKKE lov til å finne på et annet navn til hovedpersonen.
+- main_character må være nøyaktig: "${childName}"
+- Følgesvennen må ha et annet navn enn ${childName}.
+- Følgesvennen må ikke hete det samme som hovedpersonen.
+- Hvis favorittdyret er hund, kan følgesvennen gjerne være en hund, men navnet må ikke være ${childName}.
 
 Barn:
 Navn: ${child.child_name}
 Alder: ${child.child_age}
 Favorittdyr: ${child.favorite_animal || ''}
 Favorittfarge: ${child.favorite_color || ''}
+Favorittsted: ${child.favorite_place || ''}
 Interesser: ${child.interests || ''}
 Personlighet: ${child.personality || ''}
-Ting å unngå: ${child.things_to_avoid || ''}
 Drømmer: ${child.dreams || ''}
+Ting å unngå: ${child.things_to_avoid || ''}
 
-Lag et trygt, varmt og magisk eventyrunivers som kan vare i minst 52 kapitler.
+Lag en varm, trygg, magisk og personlig serieverden.
 
-Viktig:
-- Barnet skal være hovedpersonen.
-- Det skal være varmt, trygt og egnet som godnatthistorie.
-- Ikke bruk skumle eller voldelige elementer.
-- Lag en tydelig følgesvenn basert på barnets favorittdyr hvis mulig.
-- Følgesvennen skal aldri bytte navn senere.
-- Lag et oppdrag som kan fortsette uke etter uke.
-- Bruk korte, varme og barnevennlige navn.
-- Foretrekk norske, nordiske eller universelle barnenavn.
-- Unngå tilfeldige, rare eller malplasserte navn.
+VIKTIG:
+- Serien skal kunne vare i mange kapitler.
+- Det skal finnes et tydelig langtidsmysterium eller hovedoppdrag.
+- Følgesvennen skal være en ekte karakter med personlighet, styrker, svakheter, hobby og et lite favorittuttrykk.
+- Følgesvennen skal kunne bidra aktivt i handlingen.
+- Universet skal passe barnets interesser.
+- Ikke lag skumle, mørke eller voldelige elementer.
+- Ikke bruk våpen, krig, monstre, demoner eller skrekk.
 
 Svar KUN som gyldig JSON uten markdown:
 {
   "universe_name": "",
-  "main_character": "",
+  "main_character": "${childName}",
   "companion_name": "",
   "companion_type": "",
-
   "companion_personality": "",
   "companion_power": "",
   "companion_weakness": "",
   "companion_hobby": "",
   "companion_phrase": "",
-
   "story_goal": "",
   "memory": ""
 }
 `;
+
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -98,14 +128,15 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er en ekspert på trygge, magiske norske godnatthistorier for barn. Du bygger stabile eventyrunivers som kan vare lenge. Du svarer alltid med ren JSON når du blir bedt om det.',
+            'Du lager Story Bible for norske barnebokserier. Du følger navnelås strengt. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.65,
+      temperature: 0.35,
+      response_format: { type: 'json_object' },
     }),
   });
 
@@ -113,10 +144,7 @@ Svar KUN som gyldig JSON uten markdown:
 
   if (!openaiResponse.ok) {
     return NextResponse.json(
-      {
-        error: 'OpenAI-feil',
-        details: aiData,
-      },
+      { error: 'OpenAI-feil.', details: aiData },
       { status: 500 }
     );
   }
@@ -125,10 +153,7 @@ Svar KUN som gyldig JSON uten markdown:
 
   if (!text) {
     return NextResponse.json(
-      {
-        error: 'OpenAI ga ikke svar.',
-        details: aiData,
-      },
+      { error: 'OpenAI ga ikke svar.', details: aiData },
       { status: 500 }
     );
   }
@@ -136,44 +161,61 @@ Svar KUN som gyldig JSON uten markdown:
   let bible;
 
   try {
-    bible = JSON.parse(text);
+    bible = JSON.parse(cleanJson(text));
   } catch {
     return NextResponse.json(
       {
-        error: 'Kunne ikke lese AI-svar som JSON.',
+        error: 'Kunne ikke lese Story Bible som JSON.',
         raw: text,
       },
       { status: 500 }
     );
   }
 
+  bible.main_character = childName;
+
+  if (
+    !bible.companion_name ||
+    String(bible.companion_name).trim().toLowerCase() === childName.toLowerCase()
+  ) {
+    bible.companion_name = fallbackCompanionName(child.favorite_animal);
+  }
+
+  if (!bible.companion_type) {
+    bible.companion_type = child.favorite_animal || 'magisk følgesvenn';
+  }
+
   const { data, error } = await supabaseAdmin
     .from('story_bibles')
     .insert({
       child_id: childId,
-      universe_name: bible.universe_name,
-      main_character: bible.main_character,
+      universe_name: bible.universe_name || `${childName}s eventyrverden`,
+      main_character: childName,
       companion_name: bible.companion_name,
       companion_type: bible.companion_type,
-      story_goal: bible.story_goal,
-      current_chapter: 1,
-      memory: bible.memory,
+      companion_personality: bible.companion_personality || '',
+      companion_power: bible.companion_power || '',
+      companion_weakness: bible.companion_weakness || '',
+      companion_hobby: bible.companion_hobby || '',
+      companion_phrase: bible.companion_phrase || '',
+      story_goal: bible.story_goal || '',
+      current_chapter: 0,
+      memory: bible.memory || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .select()
     .single();
 
   if (error) {
     return NextResponse.json(
-      {
-        error: 'Kunne ikke lagre Story Bible.',
-        details: error,
-      },
+      { error: 'Kunne ikke lagre Story Bible.', details: error },
       { status: 500 }
     );
   }
 
   return NextResponse.json({
     success: true,
-    storyBible: data,
+    bible: data,
   });
 }
