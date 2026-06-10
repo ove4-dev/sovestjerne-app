@@ -11,6 +11,45 @@ type SeasonEpisode = {
   ending_hook?: string;
 };
 
+type ChapterResult = {
+  title: string;
+  summary: string;
+  story_text: string;
+  continuity_update: string;
+  state_update?: {
+    active_goal?: string;
+    completed_goals?: string[];
+    found_items?: string[];
+    known_places?: string[];
+    known_characters?: string[];
+    open_mysteries?: string[];
+  };
+  character_updates?: Array<{
+    name?: string;
+    role?: string;
+    personality?: string;
+    description?: string;
+    fear?: string;
+    dream?: string;
+    secret?: string;
+    favorite_thing?: string;
+    habit?: string;
+  }>;
+};
+
+type CheckerResult = {
+  total_score: number;
+  character_depth: number;
+  companion_use: number;
+  mystery_quality: number;
+  dialogue_quality: number;
+  variation: number;
+  continuity: number;
+  bedtime_feel: number;
+  should_rewrite: boolean;
+  rewrite_instructions: string;
+};
+
 function asArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map(String).filter(Boolean);
@@ -19,6 +58,279 @@ function asArray(value: unknown): string[] {
 function mergeUnique(oldItems: unknown, newItems: unknown): string[] {
   const combined = [...asArray(oldItems), ...asArray(newItems)];
   return Array.from(new Set(combined.map((item) => item.trim()).filter(Boolean)));
+}
+
+function cleanJson(text: string) {
+  return text
+    .trim()
+    .replace(/^```json/i, '')
+    .replace(/^```/i, '')
+    .replace(/```$/i, '')
+    .trim();
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function normalizeChapter(value: unknown): ChapterResult {
+  const item = value as Partial<ChapterResult>;
+
+  return {
+    title: String(item?.title || ''),
+    summary: String(item?.summary || ''),
+    story_text: String(item?.story_text || ''),
+    continuity_update: String(item?.continuity_update || item?.summary || ''),
+    state_update:
+      item?.state_update && typeof item.state_update === 'object'
+        ? item.state_update
+        : {},
+    character_updates: Array.isArray(item?.character_updates)
+      ? item.character_updates
+      : [],
+  };
+}
+
+function normalizeChecker(value: unknown): CheckerResult {
+  const item = value as Partial<CheckerResult>;
+  const total = Number(item?.total_score || 0);
+
+  return {
+    total_score: total,
+    character_depth: Number(item?.character_depth || 0),
+    companion_use: Number(item?.companion_use || 0),
+    mystery_quality: Number(item?.mystery_quality || 0),
+    dialogue_quality: Number(item?.dialogue_quality || 0),
+    variation: Number(item?.variation || 0),
+    continuity: Number(item?.continuity || 0),
+    bedtime_feel: Number(item?.bedtime_feel || 0),
+    should_rewrite: Boolean(item?.should_rewrite) || total < 8,
+    rewrite_instructions: String(item?.rewrite_instructions || ''),
+  };
+}
+
+function fixCompanionNames(
+  chapter: ChapterResult,
+  correctCompanionName: string,
+  childName: string
+) {
+  const wrongCompanionNames = ['Bobby', 'Max', 'Milo', 'Nova', 'Rufus'];
+
+  for (const wrongName of wrongCompanionNames) {
+    if (
+      wrongName.toLowerCase() === correctCompanionName.toLowerCase() ||
+      wrongName.toLowerCase() === childName.toLowerCase()
+    ) {
+      continue;
+    }
+
+    chapter.story_text = chapter.story_text.replaceAll(wrongName, correctCompanionName);
+    chapter.summary = chapter.summary.replaceAll(wrongName, correctCompanionName);
+    chapter.title = chapter.title.replaceAll(wrongName, correctCompanionName);
+    chapter.continuity_update = chapter.continuity_update.replaceAll(
+      wrongName,
+      correctCompanionName
+    );
+  }
+
+  return chapter;
+}
+
+async function callOpenAiJson<T>({
+  system,
+  user,
+  temperature,
+}: {
+  system: string;
+  user: string;
+  temperature: number;
+}): Promise<T> {
+  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  const aiData = await openaiResponse.json();
+
+  if (!openaiResponse.ok) {
+    throw new Error(JSON.stringify(aiData));
+  }
+
+  const text = aiData.choices?.[0]?.message?.content;
+
+  if (!text) {
+    throw new Error(`OpenAI ga ikke svar: ${JSON.stringify(aiData)}`);
+  }
+
+  return JSON.parse(cleanJson(text)) as T;
+}
+
+async function checkChapterQuality({
+  chapter,
+  checkerContext,
+}: {
+  chapter: ChapterResult;
+  checkerContext: string;
+}) {
+  const checkerPrompt = `
+Du er redaktør for en norsk barnebokserie.
+
+Vurder kapittelet strengt.
+
+Gi score 1-10 på:
+- character_depth
+- companion_use
+- mystery_quality
+- dialogue_quality
+- variation
+- continuity
+- bedtime_feel
+
+Kapittelet skal skrives om hvis:
+- total_score er under 8
+- følgesvennen er flat
+- dialogen er generisk
+- mysteriet løses for raskt
+- en ny karakter forklarer for mye
+- historien har tidsfeil, for eksempel dag som plutselig blir natt
+- kapittelet finner en stor hovedting for tidlig
+- teksten føles som AI-barnebok i stedet for ekte barnebok
+
+VIKTIG:
+- Følgesvennen må påvirke handlingen aktivt.
+- Nye karakterer skal gi ledetråder, ikke komplette svar.
+- Store mysterier skal bygges gradvis.
+- Ikke godkjenn dialog som bare er "Ja!", "La oss!", "Så spennende!".
+- Ikke godkjenn generiske setninger som "eventyret var ikke over" hvis de virker mekaniske.
+- Ikke godkjenn at hovedmysteriet løses for tidlig.
+
+Kontekst:
+${checkerContext}
+
+Kapittel:
+Tittel: ${chapter.title}
+Oppsummering: ${chapter.summary}
+
+Tekst:
+${chapter.story_text}
+
+Svar KUN som gyldig JSON:
+{
+  "total_score": 0,
+  "character_depth": 0,
+  "companion_use": 0,
+  "mystery_quality": 0,
+  "dialogue_quality": 0,
+  "variation": 0,
+  "continuity": 0,
+  "bedtime_feel": 0,
+  "should_rewrite": true,
+  "rewrite_instructions": ""
+}
+`;
+
+  const result = await callOpenAiJson<CheckerResult>({
+    system:
+      'Du er en streng, men hjelpsom redaktør for norske barnebøker. Du svarer alltid med ren JSON.',
+    user: checkerPrompt,
+    temperature: 0.15,
+  });
+
+  return normalizeChecker(result);
+}
+
+async function rewriteChapter({
+  originalPrompt,
+  chapter,
+  checker,
+}: {
+  originalPrompt: string;
+  chapter: ChapterResult;
+  checker: CheckerResult;
+}) {
+  const rewritePrompt = `
+Du skal skrive kapittelet på nytt fordi redaktøren ikke godkjente første versjon.
+
+REDATØRENS SCORE:
+Total score: ${checker.total_score}/10
+Character depth: ${checker.character_depth}/10
+Companion use: ${checker.companion_use}/10
+Mystery quality: ${checker.mystery_quality}/10
+Dialogue quality: ${checker.dialogue_quality}/10
+Variation: ${checker.variation}/10
+Continuity: ${checker.continuity}/10
+Bedtime feel: ${checker.bedtime_feel}/10
+
+REDATØRENS INSTRUKSJONER:
+${checker.rewrite_instructions}
+
+VIKTIGE FORBEDRINGER:
+- Gjør følgesvennen mer levende og aktiv.
+- Fjern generisk dialog.
+- Ikke la nye karakterer forklare hele løsningen.
+- Ikke løs hovedmysteriet for raskt.
+- Ikke finn selve hovedobjektet for tidlig hvis det bør bygges opp.
+- Unngå tidsfeil.
+- Behold rolig godnatthistorie-følelse.
+- Behold korrekt hovedperson og følgesvenn.
+- Behold JSON-formatet nøyaktig.
+
+FØRSTE VERSJON SOM SKAL FORBEDRES:
+${JSON.stringify(chapter, null, 2)}
+
+OPPRINNELIG GENERERINGSPROMPT:
+${originalPrompt}
+
+Svar KUN som gyldig JSON uten markdown:
+{
+  "title": "",
+  "summary": "Kort oppsummering av akkurat dette kapittelet.",
+  "story_text": "",
+  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere.",
+  "state_update": {
+    "active_goal": "",
+    "completed_goals": [],
+    "found_items": [],
+    "known_places": [],
+    "known_characters": [],
+    "open_mysteries": []
+  },
+  "character_updates": [
+    {
+      "name": "",
+      "role": "",
+      "personality": "",
+      "description": "",
+      "fear": "",
+      "dream": "",
+      "secret": "",
+      "favorite_thing": "",
+      "habit": ""
+    }
+  ]
+}
+`;
+
+  const rewritten = await callOpenAiJson<ChapterResult>({
+    system:
+      'Du er en prisvinnende norsk barnebokforfatter og redaktør. Du skriver kapittelet på nytt slik at det føles som en ekte barnebokserie. Du svarer alltid med ren JSON.',
+    user: rewritePrompt,
+    temperature: 0.46,
+  });
+
+  return normalizeChapter(rewritten);
 }
 
 export async function POST(request: Request) {
@@ -120,16 +432,16 @@ export async function POST(request: Request) {
     outline.find((episode) => Number(episode.chapter_in_season) === chapterInSeason) ||
     outline[chapterInSeason - 1];
 
-const storyStyle = createStoryStyle({
-  childName: child.child_name,
-  companionName: bible.companion_name,
-  interests: child.interests,
-  favoriteAnimal: child.favorite_animal,
-  favoritePlace: child.favorite_place,
-  favoriteColor: child.favorite_color,
-  seasonTheme: season?.season_theme,
-  mainQuest: season?.main_quest || bible.story_goal,
-});
+  const storyStyle = createStoryStyle({
+    childName: child.child_name,
+    companionName: bible.companion_name,
+    interests: child.interests,
+    favoriteAnimal: child.favorite_animal,
+    favoritePlace: child.favorite_place,
+    favoriteColor: child.favorite_color,
+    seasonTheme: season?.season_theme,
+    mainQuest: season?.main_quest || bible.story_goal,
+  });
 
   const styleBank = await getStoryStyleBank();
 
@@ -267,13 +579,6 @@ ${bible.memory || 'Ingen ekstra minne ennå.'}
 STORY STATE:
 ${stateText}
 
-VIKTIGE STATE-REGLER:
-- Ikke la barnet finne en gjenstand som allerede står under "Ting som allerede er funnet".
-- Ikke la barnet fullføre et mål som allerede står under "Fullførte mål".
-- Ikke gjenta samme gjennombrudd fra tidligere kapitler.
-- Bruk "Åpne mysterier" til å skape fremdrift.
-- Oppdater state_update tydelig etter kapittelet.
-
 Aktiv sesongplan:
 Sesongtema: ${season?.season_theme || ''}
 Sesongens hovedmål: ${season?.main_quest || bible.story_goal || ''}
@@ -324,147 +629,37 @@ ${storyStyle.mysteryStyle}
 Forfatterinstruksjoner:
 ${storyStyle.authorInstructions.join('\n')}
 
-SOVESTJERNE-STIL:
-
-STILBANKREGLER:
-- Bruk stilbanken som inspirasjon.
-- Ikke kopier formuleringene direkte.
-- Varier mot de siste kapitlene.
-- Hvis åpningen ligner på et nylig kapittel, bruk en annen åpning.
-- Hvis avslutningen ligner på et nylig kapittel, bruk en annen avslutning.
-
-FORBUDTE AI-MØNSTRE:
-- Ikke start flere kapitler på rad med samme type åpning.
-- Ikke avslutt flere kapitler på rad med samme type avslutning.
-- Unngå dialogmønstre som:
-  "Ja!"
-  "La oss!"
-  "Så spennende!"
-- Gi karakterene mer naturlige og varierte replikker.
-- Unngå at nye karakterer dukker opp kun for å gi svar.
-- Unngå at mysterier løses i samme scene som de introduseres.
-
-- Skriv som en ekte barnebokforfatter, ikke som en AI-assistent.
-- Vis følelser gjennom handling.
-- Ikke forklar moralen rett ut.
-- Unngå setninger som "Kari lærte at...".
-- Bruk heller varme øyeblikk, små detaljer og dialog.
-- Historien skal ha mer eventyr, mysterium og oppdagelse enn prat om regler.
-- Barnet skal kjenne mestring, nysgjerrighet og trygghet.
-- Del story_text inn i tydelige avsnitt.
-- Bruk blank linje mellom avsnitt.
-- Dialog skal ofte stå på egen linje.
-
-KAPITTELSTRUKTUR:
-1. Bruk den foreslåtte åpningen som inspirasjon.
-2. Fortsettelse fra forrige kapittel.
-3. Dagens mål fra sesongplanen.
-4. Liten utfordring eller undring.
-5. Samarbeid mellom barnet og følgesvennen.
-6. Konkret fremgang i hovedhistorien.
-7. Bruk den foreslåtte avslutningen som inspirasjon.
-8. En mild krok til neste kapittel.
-
-REGLER:
+VIKTIGE REGLER:
 - Skriv på norsk.
 - Barnet skal alltid være hovedpersonen.
 - Historien skal være varm, trygg, magisk og barnevennlig.
 - Passer som godnatthistorie.
 - Lengde ca. 700–1000 ord.
 - Dagens mål, nøkkelhendelse og avslutningskrok fra sesongplanen må brukes.
-- Hvis sesongplanen sier at noe skal finnes, oppdages eller forstås, må det faktisk skje i kapittelet.
-- Ikke bruk flere kapitler på samme lille hendelse med mindre sesongplanen krever det.
-- Hvert kapittel må endre noe.
-
-SERIEREGLER:
 - Historien må aldri starte på nytt.
 - Historien må aldri føles som første kapittel igjen.
 - Bruk minst én konkret ting fra tidligere kapitler eller serie-minnet.
-- Gjenbruk etablerte steder, figurer og gjenstander.
-- Ikke lag en ny hovedhistorie hvis en allerede finnes.
-- Ikke bytt ut hovedoppdraget midt i serien.
 - Ikke bytt univers.
-
-KARAKTERREGLER:
-
-VIKTIGE KARAKTERREGLER:
-- Ingen ny karakter får løse hovedproblemet alene.
+- Ikke bytt hovedoppdrag.
+- Ikke gå fra dag til natt uten overgang.
+- Ikke la barnet finne selve hovedobjektet for tidlig.
+- Ikke løs store mysterier i samme kapittel som de introduseres.
 - Nye karakterer skal gi ledetråder, ikke komplette svar.
-- Eksisterende karakterer skal brukes før nye karakterer introduseres.
-- Maks én ny viktig karakter per kapittel.
-- Nye karakterer må ha en tydelig rolle i sesonghistorien.
+- Ingen ny karakter får løse hovedproblemet alene.
+- Følgesvennen må gjøre minst én viktig handling.
+- Følgesvennen skal ha egne tanker, reaksjoner og ideer.
+- Følgesvennen skal ikke bare si "Ja!", "La oss!" eller "Så spennende!".
+- Følgesvennen heter alltid ${bible.companion_name}.
+- Ikke endre navn på følgesvennen.
+- Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
+- Ingen banning, mobbing, våpen, krig, blod, skrekk, demoner, alkohol, tobakk, narkotika, pengespill eller voksenromantikk.
 
 KARAKTERDYBDE:
 - Når en karakter brukes, skal personlighet, frykt, drøm, hemmelighet, favorittting eller vane påvirke scenen.
 - Ikke la karakterer være flate hjelpere.
-- Følgesvennen skal ha minst én tydelig reaksjon som passer personligheten.
 - Tilbakevendende karakterer skal føles gjenkjennelige fra tidligere kapitler.
 - Nye karakterer skal få minst ett tydelig særtrekk.
-- Karakterer skal ha egne meninger, små vaner og reaksjoner.
-- Hvis en karakter har en frykt, skal den kunne skape en liten indre utfordring.
-- Hvis en karakter har en drøm, skal den kunne drive valgene deres.
-- Hvis en karakter har en hemmelighet, skal den brukes forsiktig over flere kapitler.
 - Ikke avslør alle hemmeligheter med én gang.
-
-FØLGESVENN-REGLER:
-- Følgesvennen må gjøre minst én viktig handling i hvert kapittel.
-- Følgesvennen må påvirke handlingen aktivt.
-- Følgesvennen skal ikke bare være enig med hovedpersonen.
-- Følgesvennen skal ha egne tanker, reaksjoner og ideer.
-- Følgesvennen skal bruke sin personlighet, styrke, svakhet eller hobby minst én gang i hvert kapittel.
-- Følgesvennen skal bruke favorittuttrykket sitt naturlig av og til, men ikke i hvert eneste kapittel.
-- Følgesvennen kan gjøre feil, misforstå ting eller oppdage noe hovedpersonen overser.
-- Følgesvennen skal føles som en ekte karakter og ikke bare en hjelper.
-- Hvis følgesvennen ikke påvirker handlingen, er kapittelet feil.
-
-MYSTERIEREGLER:
-- Ikke gi hele svaret med en gang.
-- Ledetråder skal ofte være ufullstendige.
-- Mysterier skal bygges gradvis over flere kapitler.
-- Nye karakterer skal helst gi en ledetråd, ikke løsningen.
-- Barnet og følgesvennen skal selv løse de viktigste delene av mysteriet.
-- Store mysterier skal følge: oppdagelse → forståelse → løsning over flere kapitler.
-- Ikke løs et stort mysterium i samme kapittel som det introduseres.
-
-- Gjenbruk eksisterende karakterer før nye introduseres.
-- Hvis en karakter allerede finnes, behold navn, rolle og personlighet.
-- Ikke introduser en ny viktig karakter hvis en eksisterende karakter kan fylle rollen.
-- Maks én ny viktig karakter i dette kapittelet.
-- Nye karakterer skal ha en tydelig rolle i hovedhistorien.
-- Følgesvennen skal være den viktigste karakteren etter barnet.
-- Følgesvennen skal ha egen personlighet, varme, humor og meninger.
-- Følgesvennen skal bidra aktivt til løsningen.
-- Ikke bytt ut fast følgesvenn.
-- Ikke endre navn på følgesvennen. Følgesvennen heter alltid ${bible.companion_name}.
-- Bruk familie, venner, kjæledyr eller andre elementer fra "Aktive elementer" naturlig og forsiktig.
-- Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
-- Nye elementer fra foreldre skal flettes gradvis inn. Ikke press alt inn på én gang.
-
-KRITISK NAVNELÅS:
-Følgesvennen heter alltid ${bible.companion_name}.
-Du har ikke lov til å gi følgesvennen et nytt navn.
-Hvis du bruker et annet navn enn ${bible.companion_name}, er kapittelet feil.
-Før du svarer skal du kontrollere at følgesvennen kun omtales som ${bible.companion_name}.
-
-NAVNEREGLER:
-- Bruk korte, varme og barnevennlige navn.
-- Foretrekk norske, nordiske eller universelle barnenavn.
-- Unngå navn som virker tilfeldige, rare, komiske eller malplasserte.
-- Ikke bruk navn som virker for voksne, aggressive eller useriøse.
-- Gjenbruk etablerte navn før du lager nye.
-
-TRYGGHETSREGLER:
-- Ingen banning.
-- Ingen mobbing.
-- Ingen nedsettende språk.
-- Ingen våpen.
-- Ingen krig.
-- Ingen blod eller skader.
-- Ingen skrekkhistorier.
-- Ingen demoner.
-- Ingen alkohol, tobakk, narkotika eller pengespill.
-- Ingen voksenromantikk.
-- Ingen voldelige eller truende situasjoner.
 
 AVSLUTNING:
 - Dagens lille hendelse skal lukkes.
@@ -472,7 +667,6 @@ AVSLUTNING:
 - Kapittelet skal slutte rolig nok for leggetid.
 - Avslutningen skal samtidig gi en mild forventning til neste kapittel.
 - Bruk avslutningskroken fra sesongplanen.
-- Bruk den foreslåtte avslutningen som inspirasjon.
 - Unngå generiske avslutninger som bare sier "de gledet seg til neste dag".
 
 Svar KUN som gyldig JSON uten markdown:
@@ -505,74 +699,68 @@ Svar KUN som gyldig JSON uten markdown:
 }
 `;
 
-  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Du er en prisvinnende norsk barnebokforfatter og serieforfatter. Du skriver levende karakterer med tydelige personligheter. Du lar mysterier utvikle seg gradvis. Du unngår gjentakelser. Du unngår at nye karakterer løser problemer for hovedpersonene. Du sørger for at følgesvennen føles som en ekte figur med egne styrker, svakheter, vaner og meninger. Du skriver som en profesjonell forfatter, ikke som en AI-assistent. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Du svarer alltid med ren JSON.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.54,
-    }),
-  });
-
-  const aiData = await openaiResponse.json();
-
-  if (!openaiResponse.ok) {
-    return NextResponse.json(
-      { error: `OpenAI-feil: ${JSON.stringify(aiData)}` },
-      { status: 500 }
-    );
-  }
-
-  const text = aiData.choices?.[0]?.message?.content;
-
-  if (!text) {
-    return NextResponse.json(
-      { error: `OpenAI ga ikke svar: ${JSON.stringify(aiData)}` },
-      { status: 500 }
-    );
-  }
-
-  let chapter;
+  let chapter: ChapterResult;
+  let checker: CheckerResult | null = null;
+  let wasRewritten = false;
+  let checkerError: string | null = null;
 
   try {
-    chapter = JSON.parse(text);
-  } catch {
+    const generated = await callOpenAiJson<ChapterResult>({
+      system:
+        'Du er en prisvinnende norsk barnebokforfatter og serieforfatter. Du skriver levende karakterer med tydelige personligheter. Du lar mysterier utvikle seg gradvis. Du unngår gjentakelser. Du unngår at nye karakterer løser problemer for hovedpersonene. Du sørger for at følgesvennen føles som en ekte figur med egne styrker, svakheter, vaner og meninger. Du skriver som en profesjonell forfatter, ikke som en AI-assistent. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Du svarer alltid med ren JSON.',
+      user: prompt,
+      temperature: 0.54,
+    });
+
+    chapter = normalizeChapter(generated);
+    chapter = fixCompanionNames(chapter, bible.companion_name, child.child_name);
+  } catch (error) {
     return NextResponse.json(
-      {
-        error: 'Kunne ikke lese AI-svar som JSON.',
-        raw: text,
-      },
+      { error: `OpenAI-feil ved generering: ${errorMessage(error)}` },
       { status: 500 }
     );
   }
 
-  const correctCompanionName = bible.companion_name;
-  const wrongCompanionNames = ['Bobby', 'Max', 'Milo', 'Nova'];
+  const checkerContext = `
+Barn: ${child.child_name}
+Følgesvenn: ${bible.companion_name}
+Univers: ${bible.universe_name}
+Langtidsoppdrag: ${bible.story_goal}
 
-  for (const wrongName of wrongCompanionNames) {
-    if (wrongName !== correctCompanionName) {
-      chapter.story_text = chapter.story_text?.replaceAll(wrongName, correctCompanionName);
-      chapter.summary = chapter.summary?.replaceAll(wrongName, correctCompanionName);
-      chapter.title = chapter.title?.replaceAll(wrongName, correctCompanionName);
-      chapter.continuity_update = chapter.continuity_update?.replaceAll(
-        wrongName,
-        correctCompanionName
-      );
+Dagens mål:
+${episodePlan?.chapter_goal || ''}
+
+Nøkkelhendelse:
+${episodePlan?.key_event || ''}
+
+Avslutningskrok:
+${episodePlan?.ending_hook || ''}
+
+Eksisterende karakterer:
+${charactersText}
+
+Siste kapitler:
+${historyText}
+`;
+
+  try {
+    checker = await checkChapterQuality({
+      chapter,
+      checkerContext,
+    });
+
+    if (checker.should_rewrite || checker.total_score < 8) {
+      chapter = await rewriteChapter({
+        originalPrompt: prompt,
+        chapter,
+        checker,
+      });
+
+      chapter = fixCompanionNames(chapter, bible.companion_name, child.child_name);
+      wasRewritten = true;
     }
+  } catch (error) {
+    checkerError = errorMessage(error);
   }
 
   const { data, error } = await supabaseAdmin
@@ -688,5 +876,8 @@ Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
   return NextResponse.json({
     success: true,
     story: data,
+    checker,
+    wasRewritten,
+    checkerError,
   });
 }
