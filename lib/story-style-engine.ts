@@ -10,10 +10,7 @@ type StoryStyleInput = {
 };
 
 function pickRandom(items: string[]) {
-  return items[Math.floor(Math.random() *  interests?: string | null;
-  favoriteAnimal?: string | null;
-  favoritePlace?: string | null;
-  items.length)];
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 function clean(value?: string | null) {
@@ -156,9 +153,9 @@ export function createStoryStyle(input: StoryStyleInput) {
     `${companion} stoppet plutselig og lyttet.`,
     `Et ${color} lys blinket svakt foran dem.`,
     `${childName} klarte ikke slutte å tenke på ${quest}.`,
-    `Noe hadde forandret seg siden forrige eventyr.`,
-    `Et lite spor dukket opp der ingen hadde sett før.`,
-    `Luften dirret som om et nytt mysterium var på vei.`,
+    'Noe hadde forandret seg siden forrige eventyr.',
+    'Et lite spor dukket opp der ingen hadde sett før.',
+    'Luften dirret som om et nytt mysterium var på vei.',
     `${companion} fant noe som ikke hadde vært der i går.`,
     `${childName} kjente det krible i magen.`,
   ];
