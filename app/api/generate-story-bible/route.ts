@@ -85,7 +85,7 @@ Svar KUN som gyldig JSON uten markdown:
   "story_goal": "",
   "memory": ""
 }
-
+`;
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
