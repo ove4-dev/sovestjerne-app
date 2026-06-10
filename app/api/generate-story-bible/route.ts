@@ -75,10 +75,16 @@ Svar KUN som gyldig JSON uten markdown:
   "main_character": "",
   "companion_name": "",
   "companion_type": "",
+
+  "companion_personality": "",
+  "companion_power": "",
+  "companion_weakness": "",
+  "companion_hobby": "",
+  "companion_phrase": "",
+
   "story_goal": "",
   "memory": ""
 }
-`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
