@@ -128,9 +128,8 @@ export async function POST(request: Request) {
     favoriteColor: child.favorite_color,
     seasonTheme: season?.season_theme,
     mainQuest: season?.main_quest || bible.story_goal,
-    const styleBank = await getStoryStyleBank();
   });
-
+const styleBank = await getStoryStyleBank();
   const historyText =
     chronologicalStories.length > 0
       ? chronologicalStories
