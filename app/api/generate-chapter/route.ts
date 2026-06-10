@@ -129,7 +129,9 @@ export async function POST(request: Request) {
     seasonTheme: season?.season_theme,
     mainQuest: season?.main_quest || bible.story_goal,
   });
-const styleBank = await getStoryStyleBank();
+
+  const styleBank = await getStoryStyleBank();
+
   const historyText =
     chronologicalStories.length > 0
       ? chronologicalStories
@@ -179,11 +181,11 @@ ${(story.story_text || '').slice(0, 1200)}
           .join('\n')
       : 'Ingen ekstra elementer lagt til ennå.';
 
-const charactersText =
-  storyCharacters && storyCharacters.length > 0
-    ? storyCharacters
-        .map(
-          (c) => `
+  const charactersText =
+    storyCharacters && storyCharacters.length > 0
+      ? storyCharacters
+          .map(
+            (c) => `
 Navn: ${c.name}
 Rolle: ${c.role || ''}
 Personlighet: ${c.personality || ''}
@@ -194,9 +196,9 @@ Hemmelighet: ${c.secret || ''}
 Favorittting: ${c.favorite_thing || ''}
 Vane: ${c.habit || ''}
 `
-        )
-        .join('\n')
-    : 'Ingen registrerte karakterer ennå.';
+          )
+          .join('\n')
+      : 'Ingen registrerte karakterer ennå.';
 
   const stateText = `
 Aktivt mål:
@@ -291,6 +293,7 @@ Siste kapitler:
 ${historyText}
 
 PERSONLIG HISTORIESTIL:
+
 EKSTRA STILBANK:
 
 Åpningstype:
@@ -323,7 +326,6 @@ ${storyStyle.authorInstructions.join('\n')}
 SOVESTJERNE-STIL:
 
 STILBANKREGLER:
-
 - Bruk stilbanken som inspirasjon.
 - Ikke kopier formuleringene direkte.
 - Varier mot de siste kapitlene.
@@ -353,7 +355,6 @@ FORBUDTE AI-MØNSTRE:
 - Dialog skal ofte stå på egen linje.
 
 KAPITTELSTRUKTUR:
-
 1. Bruk den foreslåtte åpningen som inspirasjon.
 2. Fortsettelse fra forrige kapittel.
 3. Dagens mål fra sesongplanen.
@@ -364,7 +365,6 @@ KAPITTELSTRUKTUR:
 8. En mild krok til neste kapittel.
 
 REGLER:
-
 - Skriv på norsk.
 - Barnet skal alltid være hovedpersonen.
 - Historien skal være varm, trygg, magisk og barnevennlig.
@@ -376,7 +376,6 @@ REGLER:
 - Hvert kapittel må endre noe.
 
 SERIEREGLER:
-
 - Historien må aldri starte på nytt.
 - Historien må aldri føles som første kapittel igjen.
 - Bruk minst én konkret ting fra tidligere kapitler eller serie-minnet.
@@ -393,6 +392,18 @@ VIKTIGE KARAKTERREGLER:
 - Eksisterende karakterer skal brukes før nye karakterer introduseres.
 - Maks én ny viktig karakter per kapittel.
 - Nye karakterer må ha en tydelig rolle i sesonghistorien.
+
+KARAKTERDYBDE:
+- Når en karakter brukes, skal personlighet, frykt, drøm, hemmelighet, favorittting eller vane påvirke scenen.
+- Ikke la karakterer være flate hjelpere.
+- Følgesvennen skal ha minst én tydelig reaksjon som passer personligheten.
+- Tilbakevendende karakterer skal føles gjenkjennelige fra tidligere kapitler.
+- Nye karakterer skal få minst ett tydelig særtrekk.
+- Karakterer skal ha egne meninger, små vaner og reaksjoner.
+- Hvis en karakter har en frykt, skal den kunne skape en liten indre utfordring.
+- Hvis en karakter har en drøm, skal den kunne drive valgene deres.
+- Hvis en karakter har en hemmelighet, skal den brukes forsiktig over flere kapitler.
+- Ikke avslør alle hemmeligheter med én gang.
 
 FØLGESVENN-REGLER:
 - Følgesvennen må gjøre minst én viktig handling i hvert kapittel.
@@ -429,17 +440,12 @@ MYSTERIEREGLER:
 - Nye elementer fra foreldre skal flettes gradvis inn. Ikke press alt inn på én gang.
 
 KRITISK NAVNELÅS:
-
 Følgesvennen heter alltid ${bible.companion_name}.
-
 Du har ikke lov til å gi følgesvennen et nytt navn.
-
 Hvis du bruker et annet navn enn ${bible.companion_name}, er kapittelet feil.
-
 Før du svarer skal du kontrollere at følgesvennen kun omtales som ${bible.companion_name}.
 
 NAVNEREGLER:
-
 - Bruk korte, varme og barnevennlige navn.
 - Foretrekk norske, nordiske eller universelle barnenavn.
 - Unngå navn som virker tilfeldige, rare, komiske eller malplasserte.
@@ -447,7 +453,6 @@ NAVNEREGLER:
 - Gjenbruk etablerte navn før du lager nye.
 
 TRYGGHETSREGLER:
-
 - Ingen banning.
 - Ingen mobbing.
 - Ingen nedsettende språk.
@@ -461,7 +466,6 @@ TRYGGHETSREGLER:
 - Ingen voldelige eller truende situasjoner.
 
 AVSLUTNING:
-
 - Dagens lille hendelse skal lukkes.
 - Barnet skal føle trygghet.
 - Kapittelet skal slutte rolig nok for leggetid.
@@ -489,7 +493,12 @@ Svar KUN som gyldig JSON uten markdown:
       "name": "",
       "role": "",
       "personality": "",
-      "description": ""
+      "description": "",
+      "fear": "",
+      "dream": "",
+      "secret": "",
+      "favorite_thing": "",
+      "habit": ""
     }
   ]
 }
@@ -616,18 +625,13 @@ Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
   };
 
   if (state?.id) {
-    await supabaseAdmin
-      .from('story_state')
-      .update(nextState)
-      .eq('id', state.id);
+    await supabaseAdmin.from('story_state').update(nextState).eq('id', state.id);
   } else {
-    await supabaseAdmin
-      .from('story_state')
-      .insert({
-        child_id: childId,
-        ...nextState,
-        created_at: new Date().toISOString(),
-      });
+    await supabaseAdmin.from('story_state').insert({
+      child_id: childId,
+      ...nextState,
+      created_at: new Date().toISOString(),
+    });
   }
 
   const characterUpdates = Array.isArray(chapter.character_updates)
@@ -651,24 +655,32 @@ Kapittel ${nextChapter}: ${chapter.continuity_update || chapter.summary || ''}
           role: character.role || '',
           personality: character.personality || '',
           description: character.description || '',
+          fear: character.fear || '',
+          dream: character.dream || '',
+          secret: character.secret || '',
+          favorite_thing: character.favorite_thing || '',
+          habit: character.habit || '',
           last_seen_chapter: nextChapter,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingCharacter.id);
     } else {
-      await supabaseAdmin
-        .from('story_characters')
-        .insert({
-          child_id: childId,
-          name: character.name,
-          role: character.role || '',
-          personality: character.personality || '',
-          description: character.description || '',
-          first_chapter: nextChapter,
-          last_seen_chapter: nextChapter,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+      await supabaseAdmin.from('story_characters').insert({
+        child_id: childId,
+        name: character.name,
+        role: character.role || '',
+        personality: character.personality || '',
+        description: character.description || '',
+        fear: character.fear || '',
+        dream: character.dream || '',
+        secret: character.secret || '',
+        favorite_thing: character.favorite_thing || '',
+        habit: character.habit || '',
+        first_chapter: nextChapter,
+        last_seen_chapter: nextChapter,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
     }
   }
 
