@@ -220,7 +220,7 @@ Dette er sesong ${seasonNumber}, kapittel ${chapterInSeason} av 8.
 VIKTIG:
 Dette er IKKE en enkeltstående historie.
 Dette er neste episode i samme serie.
-Du MÅ følge sesongplanen, dagens kapittelmål og story_state.
+Du MÅ følge sesongplanen, dagens kapittelmål, story_state, eksisterende karakterer og personlig historiestil.
 
 Barn:
 Navn: ${child.child_name}
@@ -235,6 +235,22 @@ Story Bible:
 Univers: ${bible.universe_name}
 Hovedperson: ${bible.main_character}
 Fast følgesvenn: ${bible.companion_name} (${bible.companion_type})
+
+Følgesvennens personlighet:
+${bible.companion_personality || ''}
+
+Følgesvennens styrke:
+${bible.companion_power || ''}
+
+Følgesvennens svakhet:
+${bible.companion_weakness || ''}
+
+Følgesvennens hobby:
+${bible.companion_hobby || ''}
+
+Følgesvennens favorittuttrykk:
+${bible.companion_phrase || ''}
+
 Langtidsoppdrag: ${bible.story_goal}
 Minne/historikk:
 ${bible.memory || 'Ingen ekstra minne ennå.'}
@@ -284,6 +300,17 @@ ${storyStyle.authorInstructions.join('\n')}
 
 SOVESTJERNE-STIL:
 
+FORBUDTE AI-MØNSTRE:
+- Ikke start flere kapitler på rad med samme type åpning.
+- Ikke avslutt flere kapitler på rad med samme type avslutning.
+- Unngå dialogmønstre som:
+  "Ja!"
+  "La oss!"
+  "Så spennende!"
+- Gi karakterene mer naturlige og varierte replikker.
+- Unngå at nye karakterer dukker opp kun for å gi svar.
+- Unngå at mysterier løses i samme scene som de introduseres.
+
 - Skriv som en ekte barnebokforfatter, ikke som en AI-assistent.
 - Vis følelser gjennom handling.
 - Ikke forklar moralen rett ut.
@@ -329,6 +356,33 @@ SERIEREGLER:
 - Ikke bytt univers.
 
 KARAKTERREGLER:
+
+VIKTIGE KARAKTERREGLER:
+- Ingen ny karakter får løse hovedproblemet alene.
+- Nye karakterer skal gi ledetråder, ikke komplette svar.
+- Eksisterende karakterer skal brukes før nye karakterer introduseres.
+- Maks én ny viktig karakter per kapittel.
+- Nye karakterer må ha en tydelig rolle i sesonghistorien.
+
+FØLGESVENN-REGLER:
+- Følgesvennen må gjøre minst én viktig handling i hvert kapittel.
+- Følgesvennen må påvirke handlingen aktivt.
+- Følgesvennen skal ikke bare være enig med hovedpersonen.
+- Følgesvennen skal ha egne tanker, reaksjoner og ideer.
+- Følgesvennen skal bruke sin personlighet, styrke, svakhet eller hobby minst én gang i hvert kapittel.
+- Følgesvennen skal bruke favorittuttrykket sitt naturlig av og til, men ikke i hvert eneste kapittel.
+- Følgesvennen kan gjøre feil, misforstå ting eller oppdage noe hovedpersonen overser.
+- Følgesvennen skal føles som en ekte karakter og ikke bare en hjelper.
+- Hvis følgesvennen ikke påvirker handlingen, er kapittelet feil.
+
+MYSTERIEREGLER:
+- Ikke gi hele svaret med en gang.
+- Ledetråder skal ofte være ufullstendige.
+- Mysterier skal bygges gradvis over flere kapitler.
+- Nye karakterer skal helst gi en ledetråd, ikke løsningen.
+- Barnet og følgesvennen skal selv løse de viktigste delene av mysteriet.
+- Store mysterier skal følge: oppdagelse → forståelse → løsning over flere kapitler.
+- Ikke løs et stort mysterium i samme kapittel som det introduseres.
 
 - Gjenbruk eksisterende karakterer før nye introduseres.
 - Hvis en karakter allerede finnes, behold navn, rolle og personlighet.
@@ -423,14 +477,14 @@ Svar KUN som gyldig JSON uten markdown:
         {
           role: 'system',
           content:
-            'Du er hovedforfatter og redaktør for en sammenhengende norsk barnebokserie. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Din viktigste jobb er kontinuitet, trygghet, varme, progresjon, variasjon, god avslutning og ekte serie-følelse. Du svarer alltid med ren JSON.',
+            'Du er en prisvinnende norsk barnebokforfatter og serieforfatter. Du skriver levende karakterer med tydelige personligheter. Du lar mysterier utvikle seg gradvis. Du unngår gjentakelser. Du unngår at nye karakterer løser problemer for hovedpersonene. Du sørger for at følgesvennen føles som en ekte figur med egne styrker, svakheter, vaner og meninger. Du skriver som en profesjonell forfatter, ikke som en AI-assistent. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Du svarer alltid med ren JSON.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.56,
+      temperature: 0.54,
     }),
   });
 
