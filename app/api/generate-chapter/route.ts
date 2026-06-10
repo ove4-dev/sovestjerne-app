@@ -179,19 +179,24 @@ ${(story.story_text || '').slice(0, 1200)}
           .join('\n')
       : 'Ingen ekstra elementer lagt til ennå.';
 
-  const charactersText =
-    storyCharacters && storyCharacters.length > 0
-      ? storyCharacters
-          .map(
-            (c) => `
+const charactersText =
+  storyCharacters && storyCharacters.length > 0
+    ? storyCharacters
+        .map(
+          (c) => `
 Navn: ${c.name}
 Rolle: ${c.role || ''}
 Personlighet: ${c.personality || ''}
 Beskrivelse: ${c.description || ''}
+Frykt: ${c.fear || ''}
+Drøm: ${c.dream || ''}
+Hemmelighet: ${c.secret || ''}
+Favorittting: ${c.favorite_thing || ''}
+Vane: ${c.habit || ''}
 `
-          )
-          .join('\n')
-      : 'Ingen registrerte karakterer ennå.';
+        )
+        .join('\n')
+    : 'Ingen registrerte karakterer ennå.';
 
   const stateText = `
 Aktivt mål:
