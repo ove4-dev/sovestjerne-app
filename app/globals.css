@@ -121,3 +121,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--purple); box-sha
   text-align: center;
   font-weight: 700;
 }
+
+.admin-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-table tbody tr {
+  border-bottom: 5px solid #cbd5e1;
+}
+
+.admin-table tbody tr + tr td {
+  border-top: 5px solid #cbd5e1;
+}
+
+.admin-table tbody td {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+.admin-table tbody tr:hover {
+  background: #f8fafc;
+}
