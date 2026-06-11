@@ -1,15 +1,34 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
+type ParentRow = {
+  id: string;
+  email: string;
+};
+
+type ChildRow = {
+  id: string;
+  parent_email: string | null;
+  parent_id: string | null;
+  subscription_status: string | null;
+};
+
+function cleanEmailValue(value: unknown) {
+  return String(value || '').trim().toLowerCase();
+}
+
 export async function POST(request: Request) {
   try {
     const { email, code } = await request.json();
 
-    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanEmail = cleanEmailValue(email);
     const cleanCode = String(code || '').trim();
 
     if (!cleanEmail || !cleanCode) {
-      return NextResponse.json({ error: 'E-post og kode må fylles ut.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'E-post og kode må fylles ut.' },
+        { status: 400 }
+      );
     }
 
     const { data: loginCode, error } = await supabaseAdmin
@@ -19,37 +38,89 @@ export async function POST(request: Request) {
       .eq('used', false)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error || !loginCode) {
-      return NextResponse.json({ error: 'Ugyldig eller utløpt kode.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Ugyldig eller utløpt kode.' },
+        { status: 400 }
+      );
     }
 
-    if (loginCode.attempts >= 5) {
-      return NextResponse.json({ error: 'For mange forsøk. Be om ny kode.' }, { status: 400 });
+    const attempts = Number(loginCode.attempts || 0);
+
+    if (attempts >= 5) {
+      return NextResponse.json(
+        { error: 'For mange forsøk. Be om ny kode.' },
+        { status: 400 }
+      );
     }
 
     if (new Date(loginCode.expires_at) < new Date()) {
-      return NextResponse.json({ error: 'Koden er utløpt. Be om ny kode.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Koden er utløpt. Be om ny kode.' },
+        { status: 400 }
+      );
     }
 
-    if (loginCode.code !== cleanCode) {
+    if (String(loginCode.code) !== cleanCode) {
       await supabaseAdmin
         .from('parent_login_codes')
-        .update({ attempts: loginCode.attempts + 1 })
+        .update({ attempts: attempts + 1 })
         .eq('id', loginCode.id);
 
       return NextResponse.json({ error: 'Feil kode.' }, { status: 400 });
     }
 
-    const { data: parent } = await supabaseAdmin
+    let { data: parent } = await supabaseAdmin
       .from('parents')
       .select('id, email')
       .eq('email', cleanEmail)
-      .single();
+      .maybeSingle<ParentRow>();
+
+    const { data: activeChild } = await supabaseAdmin
+      .from('children')
+      .select('id, parent_email, parent_id, subscription_status')
+      .eq('parent_email', cleanEmail)
+      .eq('subscription_status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle<ChildRow>();
+
+    if (!parent && !activeChild) {
+      return NextResponse.json({ error: 'Fant ikke forelder.' }, { status: 404 });
+    }
 
     if (!parent) {
-      return NextResponse.json({ error: 'Fant ikke forelder.' }, { status: 404 });
+      const { data: newParent, error: parentInsertError } = await supabaseAdmin
+        .from('parents')
+        .insert({
+          email: cleanEmail,
+          subscription_status: 'active',
+        })
+        .select('id, email')
+        .single<ParentRow>();
+
+      if (parentInsertError || !newParent) {
+        return NextResponse.json(
+          {
+            error: 'Kunne ikke opprette forelder-login.',
+            details: parentInsertError,
+          },
+          { status: 500 }
+        );
+      }
+
+      parent = newParent;
+    }
+
+    if (activeChild && !activeChild.parent_id) {
+      await supabaseAdmin
+        .from('children')
+        .update({
+          parent_id: parent.id,
+        })
+        .eq('id', activeChild.id);
     }
 
     await supabaseAdmin
