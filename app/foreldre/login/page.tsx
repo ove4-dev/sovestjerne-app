@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 export default function ParentLoginPage() {
   const [email, setEmail] = useState('');
@@ -9,6 +9,27 @@ export default function ParentLoginPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [nextPath, setNextPath] = useState('/foreldre');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    const emailParam = params.get('email');
+    const nextParam = params.get('next');
+
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+
+    if (
+      nextParam &&
+      nextParam.startsWith('/') &&
+      !nextParam.startsWith('//')
+    ) {
+      setNextPath(nextParam);
+    }
+  }, []);
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
@@ -60,7 +81,7 @@ export default function ParentLoginPage() {
     if (!response.ok) {
       setError(result.error || 'Feil kode.');
     } else {
-      window.location.href = '/foreldre';
+      window.location.href = nextPath;
     }
 
     setLoading(false);
@@ -74,10 +95,16 @@ export default function ParentLoginPage() {
             <span className="star">★</span> Sovestjerne
           </div>
 
-          <h1>Foreldreportal</h1>
+          <h1>
+            {nextPath === '/start'
+              ? 'Start barnets eventyr'
+              : 'Foreldreportal'}
+          </h1>
 
           <p>
-            Logg inn for å lese eventyrene og se når neste kapittel kommer.
+            {nextPath === '/start'
+              ? 'Logg inn med e-post og kode for å fylle ut barnets eventyrprofil.'
+              : 'Logg inn for å lese eventyrene og se når neste kapittel kommer.'}
           </p>
         </section>
 
@@ -95,11 +122,7 @@ export default function ParentLoginPage() {
                 />
               </label>
 
-              <button
-                className="button"
-                type="submit"
-                disabled={loading}
-              >
+              <button className="button" type="submit" disabled={loading}>
                 {loading ? 'Sender...' : 'Send kode'}
               </button>
             </form>
@@ -118,27 +141,29 @@ export default function ParentLoginPage() {
                 />
               </label>
 
-              <button
-                className="button"
-                type="submit"
-                disabled={loading}
-              >
+              <button className="button" type="submit" disabled={loading}>
                 {loading ? 'Logger inn...' : 'Logg inn'}
+              </button>
+
+              <button
+                type="button"
+                className="small-btn"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  setStep('email');
+                  setCode('');
+                  setMessage('');
+                  setError('');
+                }}
+              >
+                Bruk en annen e-post
               </button>
             </form>
           )}
 
-          {message && (
-            <p className="notice">
-              {message}
-            </p>
-          )}
+          {message && <p className="notice">{message}</p>}
 
-          {error && (
-            <p className="error">
-              {error}
-            </p>
-          )}
+          {error && <p className="error">{error}</p>}
         </section>
       </div>
     </main>
