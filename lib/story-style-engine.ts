@@ -25,7 +25,7 @@ function createInterestHooks(interest: string) {
       openings: [
         'Noe merkelig hadde skjedd ved den gamle racerbanen.',
         'Et ukjent hjulspor dukket opp i bakken.',
-        'Følgesvennen fant en glitrende bildel ingen hadde sett før.',
+        'En glitrende bildel lå der ingen hadde sett før.',
         'En mystisk garasje hadde plutselig dukket opp på kartet.',
       ],
       mysteries: [
@@ -41,7 +41,7 @@ function createInterestHooks(interest: string) {
       openings: [
         'Et merkelig lys blinket ute på vannet.',
         'Noen hadde fortøyd en ukjent båt ved brygga.',
-        'Følgesvennen fant et gammelt sjøkart.',
+        'Et gammelt sjøkart dukket opp mellom tau og skjell.',
         'Bølgene bar med seg en hemmelig melding.',
       ],
       mysteries: [
@@ -57,7 +57,7 @@ function createInterestHooks(interest: string) {
       openings: [
         'Et enormt fotspor hadde dukket opp i sanden.',
         'Noen hadde sett noe bevege seg ved dinosaurdalen.',
-        'Følgesvennen fant et merkelig fossil.',
+        'Et merkelig fossil lå halvveis skjult i bakken.',
         'Et gammelt kart pekte mot de tapte dinosaurfjellene.',
       ],
       mysteries: [
@@ -68,68 +68,12 @@ function createInterestHooks(interest: string) {
     };
   }
 
-  if (lower.includes('fotball')) {
-    return {
-      openings: [
-        'En fotball lå midt på stien uten at noen visste hvorfor.',
-        'Noen hadde tegnet et merkelig symbol på fotballbanen.',
-        'Et gammelt trofé glitret i solen.',
-        'Følgesvennen fant et spor ved målstreken.',
-      ],
-      mysteries: [
-        'det forsvunne troféet',
-        'den hemmelige banen',
-        'den gylne fotballen',
-      ],
-    };
-  }
-
-  if (lower.includes('hest')) {
-    return {
-      openings: [
-        'Et nytt hovspor hadde dukket opp ved stallen.',
-        'En hvit hest stod plutselig på engen.',
-        'Følgesvennen fant en merkelig hestesko.',
-        'Noen hadde flettet blomster i gjerdet.',
-      ],
-      mysteries: [
-        'den forsvunne hesteskoen',
-        'engen med sølvgress',
-        'den hemmelige rideveien',
-      ],
-    };
-  }
-
-  if (
-    lower.includes('rom') ||
-    lower.includes('planet') ||
-    lower.includes('stjerne')
-  ) {
-    return {
-      openings: [
-        'En ny stjerne blinket på himmelen.',
-        'Kartet viste plutselig en ukjent planet.',
-        'Et svakt lys kom fra verdensrommet.',
-        'Følgesvennen oppdaget et stjernespor.',
-      ],
-      mysteries: [
-        'den tapte stjerneporten',
-        'planeten ingen hadde besøkt',
-        'det syngende stjernekartet',
-      ],
-    };
-  }
-
   return { openings: [], mysteries: [] };
 }
 
 export function createStoryStyle(input: StoryStyleInput) {
   const childName = clean(input.childName) || 'barnet';
-
-  const companion =
-    clean(input.companionName) ||
-    clean(input.favoriteAnimal) ||
-    'følgesvennen';
+  const companion = clean(input.companionName) || 'følgesvennen';
 
   const interestsList = (input.interests || '')
     .split(',')
@@ -137,8 +81,7 @@ export function createStoryStyle(input: StoryStyleInput) {
     .filter(Boolean);
 
   const primaryInterest =
-    interestsList[Math.floor(Math.random() * interestsList.length)] ||
-    'eventyr';
+    interestsList[Math.floor(Math.random() * interestsList.length)] || 'eventyr';
 
   const place = clean(input.favoritePlace) || 'et magisk sted';
   const color = clean(input.favoriteColor) || 'gyllen';
@@ -189,12 +132,7 @@ export function createStoryStyle(input: StoryStyleInput) {
     'Varier åpning og avslutning fra tidligere kapitler.',
     'Bruk sanser: lyd, lys, lukt, bevegelse og små detaljer.',
     'La følgesvennen bidra aktivt.',
-    'Gi kapittelet en konkret oppdagelse.',
-    'Unngå generiske formuleringer som "de gledet seg til neste eventyr".',
-    'Bruk dialog naturlig.',
-    'La historien føles som et ekte bokkapittel.',
     'Ikke la nye karakterer gi hele svaret.',
-    'La følgesvennen ha egne reaksjoner, små feil og egne meninger.',
     'Unngå replikker som "La oss!", "Ja!" og "Så spennende!".',
     'La mysteriet utvikle seg gradvis.',
   ];
