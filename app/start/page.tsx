@@ -1,125 +1,137 @@
 'use client';
 
-import { FormEvent, Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
 
-const interests = ['Dyr', 'Magi', 'Verdensrommet', 'Dinosaurer', 'Hester', 'Fotball', 'Eventyr', 'Pirater', 'Prinsesser', 'Havfruer', 'Biler', 'Tog'];
-const personalities = ['Modig', 'Snill', 'Nysgjerrig', 'Kreativ', 'Hjelpsom', 'Eventyrlysten', 'Morsom', 'Rolig'];
-const avoid = ['Skumle ting', 'Mørke skoger', 'Spøkelser', 'Drager', 'Høye lyder', 'Triste avslutninger'];
-function StartPageContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
+type ChildProfile = {
+  id: string;
+  child_name: string | null;
+  child_age: number | null;
+  favorite_animal: string | null;
+  favorite_color: string | null;
+  favorite_place: string | null;
+  interests: string | null;
+  personality: string | null;
+  things_to_avoid: string | null;
+  dreams: string | null;
+};
 
-  const [checkingToken, setCheckingToken] = useState(true);
-  const [tokenOk, setTokenOk] = useState(false);
-  const [tokenError, setTokenError] = useState('');
+export default function StartPage() {
+  const [child, setChild] = useState<ChildProfile | null>(null);
 
-  const [loading, setLoading] = useState(false);
+  const [childName, setChildName] = useState('');
+  const [childAge, setChildAge] = useState('');
+  const [favoriteAnimal, setFavoriteAnimal] = useState('');
+  const [favoriteColor, setFavoriteColor] = useState('');
+  const [favoritePlace, setFavoritePlace] = useState('');
+  const [interests, setInterests] = useState('');
+  const [personality, setPersonality] = useState('');
+  const [thingsToAvoid, setThingsToAvoid] = useState('');
+  const [dreams, setDreams] = useState('');
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [selectedPersonality, setSelectedPersonality] = useState<string[]>([]);
-  const [selectedAvoid, setSelectedAvoid] = useState<string[]>([]);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    async function checkToken() {
-      if (!token) {
-        setTokenOk(false);
-        setTokenError('Denne lenken er ikke gyldig. Kjøp abonnement først.');
-        setCheckingToken(false);
-        return;
-      }
+    async function loadOnboarding() {
+      setLoading(true);
+      setError('');
 
-      const response = await fetch(`/api/onboarding-token?token=${encodeURIComponent(token)}`);
+      const response = await fetch('/api/onboarding');
       const result = await response.json();
 
       if (!response.ok) {
-        setTokenOk(false);
-        setTokenError(result.error || 'Denne lenken er ikke gyldig.');
-      } else {
-        setTokenOk(true);
+        if (response.status === 401) {
+          window.location.href = '/foreldre/login?next=/start';
+          return;
+        }
+
+        setError(result.error || 'Kunne ikke hente onboarding.');
+        setLoading(false);
+        return;
       }
 
-      setCheckingToken(false);
-    }
+      const loadedChild = result.child as ChildProfile;
 
-    checkToken();
-  }, [token]);
+      setChild(loadedChild);
 
-  function toggle(value: string, list: string[], setList: (v: string[]) => void, max?: number) {
-    if (list.includes(value)) {
-      setList(list.filter((item) => item !== value));
-      return;
-    }
-    if (max && list.length >= max) return;
-    setList([...list, value]);
-  }
+      setChildName(
+        loadedChild.child_name && loadedChild.child_name !== 'Ikke utfylt ennå'
+          ? loadedChild.child_name
+          : ''
+      );
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-    setLoading(true);
+      setChildAge(loadedChild.child_age ? String(loadedChild.child_age) : '');
+      setFavoriteAnimal(loadedChild.favorite_animal || '');
+      setFavoriteColor(loadedChild.favorite_color || '');
+      setFavoritePlace(loadedChild.favorite_place || '');
+      setInterests(loadedChild.interests || '');
+      setPersonality(loadedChild.personality || '');
+      setThingsToAvoid(loadedChild.things_to_avoid || '');
+      setDreams(loadedChild.dreams || '');
 
-    const form = new FormData(event.currentTarget);
-    const payload = {
-      token,
-      parentEmail: String(form.get('parentEmail') || '').trim(),
-      parentName: String(form.get('parentName') || '').trim(),
-      childName: String(form.get('childName') || '').trim(),
-      childAge: Number(form.get('childAge') || 0),
-      favoriteAnimal: String(form.get('favoriteAnimal') || '').trim(),
-      favoriteColor: String(form.get('favoriteColor') || '').trim(),
-      favoritePlace: String(form.get('favoritePlace') || '').trim(),
-      interests: selectedInterests,
-      personality: selectedPersonality,
-      thingsToAvoid: selectedAvoid,
-      dreams: String(form.get('dreams') || '').trim(),
-    };
-
-    try {
-      const response = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Noe gikk galt. Prøv igjen.');
-      router.push('/success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Noe gikk galt. Prøv igjen.');
-    } finally {
       setLoading(false);
     }
+
+    loadOnboarding();
+  }, []);
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+
+    if (!child) return;
+
+    setSaving(true);
+    setError('');
+    setMessage('');
+
+    const response = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        childId: child.id,
+        childName,
+        childAge,
+        favoriteAnimal,
+        favoriteColor,
+        favoritePlace,
+        interests,
+        personality,
+        thingsToAvoid,
+        dreams,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || 'Kunne ikke lagre profilen.');
+      setSaving(false);
+      return;
+    }
+
+    setMessage('Profilen er lagret. Vi sender deg videre til foreldreportalen.');
+
+    setTimeout(() => {
+      window.location.href = '/foreldre';
+    }, 900);
   }
 
-  if (checkingToken) {
-    return (
-      <main className="page-shell">
-        <div className="card">
-          <section className="success-box">
-            <h1>Sjekker lenken...</h1>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  if (!tokenOk) {
+  if (loading) {
     return (
       <main className="page-shell">
         <div className="card">
           <section className="header">
-            <div className="logo"><span className="star">★</span> Sovestjerne</div>
-            <h1>Lenken er ikke gyldig</h1>
-            <p>{tokenError}</p>
-          </section>
+            <div className="logo">
+              <span className="star">★</span> Sovestjerne
+            </div>
 
-          <section className="success-box">
-            <p>For å starte barnets eventyr må abonnementet kjøpes først.</p>
-            <a className="button" href="https://sovestjerne.no" style={{ display: 'inline-block', textDecoration: 'none' }}>
-              Gå til Sovestjerne
-            </a>
+            <h1>Laster...</h1>
+
+            <p>Vi finner profilen din.</p>
           </section>
         </div>
       </main>
@@ -130,97 +142,142 @@ function StartPageContent() {
     <main className="page-shell">
       <div className="card">
         <section className="header">
-          <div className="logo"><span className="star">★</span> Sovestjerne</div>
-          <h1>La oss bli kjent med barnet ditt</h1>
-          <p>Fortell litt om barnet, så kan vi skape et personlig eventyrunivers som utvikler seg uke etter uke.</p>
+          <div className="logo">
+            <span className="star">★</span> Sovestjerne
+          </div>
+
+          <h1>Start barnets eventyr</h1>
+
+          <p>
+            Fyll ut barnets profil, så kan vi lage en personlig godnatthistorie
+            med navn, interesser, favorittdyr og riktig eventyrfølelse.
+          </p>
         </section>
 
-        <form className="form" onSubmit={handleSubmit}>
+        <form className="form" onSubmit={saveProfile}>
           {error && <div className="error">{error}</div>}
 
-          <div className="notice">✨ Første kapittel sendes kl. 17. Bestiller du etter kl. 12, sendes første kapittel neste leveringsdag.</div>
-
-          <h2 className="section-title">Forelder</h2>
-          <div className="grid">
-            <label>Din e-post
-              <input name="parentEmail" type="email" placeholder="din@email.no" required />
-            </label>
-            <label>Ditt navn
-              <input name="parentName" placeholder="F.eks. Maria" />
-            </label>
-          </div>
+          {message && <div className="notice">{message}</div>}
 
           <h2 className="section-title">Barnet</h2>
+
           <div className="grid">
-            <label>Barnets navn
-              <input name="childName" placeholder="F.eks. Amanda" required />
+            <label>
+              Barnets navn
+              <input
+                value={childName}
+                onChange={(e) => setChildName(e.target.value)}
+                placeholder="For eksempel Sander"
+                required
+              />
             </label>
-            <label>Alder
-              <select name="childAge" required defaultValue="">
-                <option value="" disabled>Velg alder</option>
-                {[3,4,5,6,7,8,9,10].map((age) => <option key={age} value={age}>{age} år</option>)}
-              </select>
+
+            <label>
+              Alder
+              <input
+                type="number"
+                min="1"
+                max="14"
+                value={childAge}
+                onChange={(e) => setChildAge(e.target.value)}
+                placeholder="7"
+                required
+              />
             </label>
           </div>
 
-          <h2 className="section-title">Favoritter</h2>
           <div className="grid">
-            <label>Favorittdyr
-              <input name="favoriteAnimal" placeholder="F.eks. hund, hest, panda" />
+            <label>
+              Favorittdyr
+              <input
+                value={favoriteAnimal}
+                onChange={(e) => setFavoriteAnimal(e.target.value)}
+                placeholder="Hund, katt, dinosaur..."
+                required
+              />
             </label>
-            <label>Favorittfarge
-              <input name="favoriteColor" placeholder="F.eks. lilla" />
+
+            <label>
+              Favorittfarge
+              <input
+                value={favoriteColor}
+                onChange={(e) => setFavoriteColor(e.target.value)}
+                placeholder="Blå, rød, lilla..."
+                required
+              />
             </label>
-            <label>Favorittsted
-              <input name="favoritePlace" placeholder="F.eks. skogen, havet, verdensrommet" />
-            </label>
           </div>
 
-          <h2 className="section-title">Interesser <span className="help">velg opptil 5</span></h2>
-          <div className="check-grid">
-            {interests.map((item) => (
-              <label className="check" key={item}>
-                <input type="checkbox" checked={selectedInterests.includes(item)} onChange={() => toggle(item, selectedInterests, setSelectedInterests, 5)} />
-                {item}
-              </label>
-            ))}
-          </div>
-
-          <h2 className="section-title">Personlighet <span className="help">velg opptil 3</span></h2>
-          <div className="check-grid">
-            {personalities.map((item) => (
-              <label className="check" key={item}>
-                <input type="checkbox" checked={selectedPersonality.includes(item)} onChange={() => toggle(item, selectedPersonality, setSelectedPersonality, 3)} />
-                {item}
-              </label>
-            ))}
-          </div>
-
-          <h2 className="section-title">Ting vi bør unngå</h2>
-          <div className="check-grid">
-            {avoid.map((item) => (
-              <label className="check" key={item}>
-                <input type="checkbox" checked={selectedAvoid.includes(item)} onChange={() => toggle(item, selectedAvoid, setSelectedAvoid)} />
-                {item}
-              </label>
-            ))}
-          </div>
-
-          <label>Hva drømmer barnet om?
-            <textarea name="dreams" placeholder="Skriv gjerne litt ekstra. F.eks. elsker hunder, liker verdensrommet, vil gjerne være modig..." />
+          <label>
+            Favorittsted
+            <span className="help">
+              Et sted historien gjerne kan bruke.
+            </span>
+            <input
+              value={favoritePlace}
+              onChange={(e) => setFavoritePlace(e.target.value)}
+              placeholder="Skogen, sjøen, racerbanen, rommet..."
+            />
           </label>
 
-          <button className="button" type="submit" disabled={loading}>{loading ? 'Lagrer...' : '✨ Lagre og start eventyret'}</button>
+          <label>
+            Hva liker barnet?
+            <span className="help">
+              Skriv gjerne flere ting. For eksempel: biler, dinosaurer, hunder,
+              havet, fotball, prinsesser, romskip.
+            </span>
+            <textarea
+              value={interests}
+              onChange={(e) => setInterests(e.target.value)}
+              placeholder="Barnet liker..."
+              required
+            />
+          </label>
+
+          <label>
+            Hvordan er barnet?
+            <span className="help">
+              For eksempel nysgjerrig, modig, forsiktig, morsom, energisk,
+              kreativ.
+            </span>
+            <textarea
+              value={personality}
+              onChange={(e) => setPersonality(e.target.value)}
+              placeholder="Barnet er..."
+              required
+            />
+          </label>
+
+          <label>
+            Hva bør historien unngå?
+            <span className="help">
+              For eksempel: ikke skummelt, ikke monstre, ikke høye lyder.
+            </span>
+            <textarea
+              value={thingsToAvoid}
+              onChange={(e) => setThingsToAvoid(e.target.value)}
+              placeholder="Unngå..."
+            />
+          </label>
+
+          <label>
+            Hva drømmer barnet om?
+            <span className="help">
+              Dette hjelper oss å lage en historie som føles personlig.
+            </span>
+            <textarea
+              value={dreams}
+              onChange={(e) => setDreams(e.target.value)}
+              placeholder="Barnet drømmer om..."
+              required
+            />
+          </label>
+
+          <button className="button" type="submit" disabled={saving}>
+            {saving ? 'Lagrer...' : 'Lagre og start eventyret'}
+          </button>
         </form>
       </div>
     </main>
-  );
-}
-
-export default function StartPage() {
-  return (
-    <Suspense fallback={<div>Laster...</div>}>
-      <StartPageContent />
-    </Suspense>
   );
 }
