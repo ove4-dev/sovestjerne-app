@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
+function addDaysToDateString(date: Date, days: number) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate.toISOString().slice(0, 10);
+}
+
 export async function POST(request: Request) {
   const adminPassword = process.env.ADMIN_PASSWORD;
   const provided = request.headers.get('x-admin-password');
@@ -34,7 +40,7 @@ export async function POST(request: Request) {
 
   const { data: child, error: childError } = await supabaseAdmin
     .from('children')
-    .select('child_name,parent_email')
+    .select('id, child_name, parent_email')
     .eq('id', story.child_id)
     .single();
 
@@ -44,6 +50,13 @@ export async function POST(request: Request) {
 
   const parentEmail = child.parent_email;
   const childName = child.child_name || 'barnet ditt';
+
+  if (!parentEmail) {
+    return NextResponse.json(
+      { error: 'Barnet mangler forelder-epost.' },
+      { status: 400 }
+    );
+  }
 
   const storyUrl = `https://app.sovestjerne.no/story/${story.id}`;
   const portalUrl = `https://app.sovestjerne.no/foreldre/login`;
@@ -116,15 +129,47 @@ export async function POST(request: Request) {
     );
   }
 
-  await supabaseAdmin
+  const sentAt = new Date();
+  const sentAtIso = sentAt.toISOString();
+  const nextChapterDate = addDaysToDateString(sentAt, 7);
+
+  const { error: storyUpdateError } = await supabaseAdmin
     .from('stories')
     .update({
       email_status: 'sent',
-      sent_at: new Date().toISOString(),
+      sent_at: sentAtIso,
       email_subject: subject,
-      updated_at: new Date().toISOString(),
+      updated_at: sentAtIso,
     })
     .eq('id', storyId);
+
+  if (storyUpdateError) {
+    return NextResponse.json(
+      {
+        error: 'E-posten ble sendt, men historien ble ikke oppdatert.',
+        details: storyUpdateError,
+      },
+      { status: 500 }
+    );
+  }
+
+  const { error: childUpdateError } = await supabaseAdmin
+    .from('children')
+    .update({
+      last_chapter_sent_at: sentAtIso,
+      next_chapter_date: nextChapterDate,
+    })
+    .eq('id', story.child_id);
+
+  if (childUpdateError) {
+    return NextResponse.json(
+      {
+        error: 'E-posten ble sendt, men neste kapitteldato ble ikke oppdatert.',
+        details: childUpdateError,
+      },
+      { status: 500 }
+    );
+  }
 
   await supabaseAdmin.from('email_logs').insert({
     child_id: story.child_id,
@@ -133,11 +178,13 @@ export async function POST(request: Request) {
     subject,
     provider_message_id: resendData.id,
     status: 'sent',
-    sent_at: new Date().toISOString(),
+    sent_at: sentAtIso,
   });
 
   return NextResponse.json({
     success: true,
     messageId: resendData.id,
+    sentAt: sentAtIso,
+    nextChapterDate,
   });
 }
