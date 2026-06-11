@@ -15,12 +15,12 @@ type ChildRow = {
   parent_id?: string | null;
   next_chapter_date: string | null;
   subscription_status: string | null;
+  created_at?: string | null;
   stories?: unknown[];
 };
 
 function getCookieValue(cookieHeader: string, name: string) {
   const parts = cookieHeader.split(';').map((part) => part.trim());
-
   const found = parts.find((part) => part.startsWith(`${name}=`));
 
   if (!found) return '';
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     .from('parents')
     .select('id, email, name, subscription_status')
     .eq('email', email)
-    .maybeSingle();
+    .maybeSingle<ParentRow>();
 
   if (!parent) {
     const { data: existingChild } = await supabaseAdmin
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         subscription_status: 'active',
       })
       .select('id, email, name, subscription_status')
-      .single();
+      .single<ParentRow>();
 
     if (parentCreateError || !newParent) {
       return NextResponse.json(
@@ -89,12 +89,10 @@ export async function GET(request: Request) {
     parent = newParent;
   }
 
-  const typedParent = parent as ParentRow;
-
   await supabaseAdmin
     .from('children')
     .update({
-      parent_id: typedParent.id,
+      parent_id: parent.id,
     })
     .eq('parent_email', email)
     .is('parent_id', null);
@@ -106,6 +104,7 @@ export async function GET(request: Request) {
     child_name,
     next_chapter_date,
     subscription_status,
+    created_at,
     stories (
       id,
       chapter_number,
@@ -121,7 +120,7 @@ export async function GET(request: Request) {
   const { data: childrenByParentId, error: parentIdError } = await supabaseAdmin
     .from('children')
     .select(childSelect)
-    .eq('parent_id', typedParent.id)
+    .eq('parent_id', parent.id)
     .order('created_at', { ascending: false });
 
   if (parentIdError) {
@@ -150,7 +149,7 @@ export async function GET(request: Request) {
   ]);
 
   return NextResponse.json({
-    parent: typedParent,
+    parent,
     children,
   });
 }
