@@ -109,27 +109,23 @@ function normalizeChecker(value: unknown): CheckerResult {
   };
 }
 
-function fixCompanionNames(
-  chapter: ChapterResult,
-  correctCompanionName: string,
-  childName: string
-) {
-  const wrongCompanionNames = ['Bobby', 'Max', 'Milo', 'Nova', 'Rufus'];
+function fixNames(chapter: ChapterResult, childName: string, companionName: string) {
+  const wrongCompanionNames = ['Bobby', 'Milo', 'Nova', 'Rufus'];
 
   for (const wrongName of wrongCompanionNames) {
     if (
-      wrongName.toLowerCase() === correctCompanionName.toLowerCase() ||
-      wrongName.toLowerCase() === childName.toLowerCase()
+      wrongName.toLowerCase() === childName.toLowerCase() ||
+      wrongName.toLowerCase() === companionName.toLowerCase()
     ) {
       continue;
     }
 
-    chapter.story_text = chapter.story_text.replaceAll(wrongName, correctCompanionName);
-    chapter.summary = chapter.summary.replaceAll(wrongName, correctCompanionName);
-    chapter.title = chapter.title.replaceAll(wrongName, correctCompanionName);
+    chapter.story_text = chapter.story_text.replaceAll(wrongName, companionName);
+    chapter.summary = chapter.summary.replaceAll(wrongName, companionName);
+    chapter.title = chapter.title.replaceAll(wrongName, companionName);
     chapter.continuity_update = chapter.continuity_update.replaceAll(
       wrongName,
-      correctCompanionName
+      companionName
     );
   }
 
@@ -204,17 +200,9 @@ Kapittelet skal skrives om hvis:
 - dialogen er generisk
 - mysteriet løses for raskt
 - en ny karakter forklarer for mye
-- historien har tidsfeil, for eksempel dag som plutselig blir natt
+- historien har tidsfeil
 - kapittelet finner en stor hovedting for tidlig
-- teksten føles som AI-barnebok i stedet for ekte barnebok
-
-VIKTIG:
-- Følgesvennen må påvirke handlingen aktivt.
-- Nye karakterer skal gi ledetråder, ikke komplette svar.
-- Store mysterier skal bygges gradvis.
-- Ikke godkjenn dialog som bare er "Ja!", "La oss!", "Så spennende!".
-- Ikke godkjenn generiske setninger som "eventyret var ikke over" hvis de virker mekaniske.
-- Ikke godkjenn at hovedmysteriet løses for tidlig.
+- teksten føles som AI-barnebok
 
 Kontekst:
 ${checkerContext}
@@ -287,18 +275,18 @@ VIKTIGE FORBEDRINGER:
 - Behold korrekt hovedperson og følgesvenn.
 - Behold JSON-formatet nøyaktig.
 
-FØRSTE VERSJON SOM SKAL FORBEDRES:
+FØRSTE VERSJON:
 ${JSON.stringify(chapter, null, 2)}
 
-OPPRINNELIG GENERERINGSPROMPT:
+OPPRINNELIG PROMPT:
 ${originalPrompt}
 
 Svar KUN som gyldig JSON uten markdown:
 {
   "title": "",
-  "summary": "Kort oppsummering av akkurat dette kapittelet.",
+  "summary": "",
   "story_text": "",
-  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere.",
+  "continuity_update": "",
   "state_update": {
     "active_goal": "",
     "completed_goals": [],
@@ -372,6 +360,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const childName = child.child_name;
+  const companionName = bible.companion_name;
+
   const { data: state } = await supabaseAdmin
     .from('story_state')
     .select('*')
@@ -433,8 +424,8 @@ export async function POST(request: Request) {
     outline[chapterInSeason - 1];
 
   const storyStyle = createStoryStyle({
-    childName: child.child_name,
-    companionName: bible.companion_name,
+    childName,
+    companionName,
     interests: child.interests,
     favoriteAnimal: child.favorite_animal,
     favoritePlace: child.favorite_place,
@@ -538,13 +529,16 @@ Du skriver kapittel ${nextChapter} i en personlig norsk barnebokserie.
 
 Dette er sesong ${seasonNumber}, kapittel ${chapterInSeason} av 8.
 
-VIKTIG:
-Dette er IKKE en enkeltstående historie.
-Dette er neste episode i samme serie.
-Du MÅ følge sesongplanen, dagens kapittelmål, story_state, eksisterende karakterer og personlig historiestil.
+KRITISK NAVNELÅS:
+- Hovedpersonen heter alltid ${childName}.
+- Følgesvennen heter alltid ${companionName}.
+- Ikke bruk andre navn på hovedperson eller følgesvenn.
+- Ikke bytt navn.
+- Ikke skriv at hovedpersonen heter ${companionName}.
+- Ikke skriv at følgesvennen heter ${childName}.
 
 Barn:
-Navn: ${child.child_name}
+Navn: ${childName}
 Alder: ${child.child_age}
 Favorittdyr: ${child.favorite_animal || ''}
 Favorittfarge: ${child.favorite_color || ''}
@@ -554,27 +548,14 @@ Drømmer: ${child.dreams || ''}
 
 Story Bible:
 Univers: ${bible.universe_name}
-Hovedperson: ${bible.main_character}
-Fast følgesvenn: ${bible.companion_name} (${bible.companion_type})
-
-Følgesvennens personlighet:
-${bible.companion_personality || ''}
-
-Følgesvennens styrke:
-${bible.companion_power || ''}
-
-Følgesvennens svakhet:
-${bible.companion_weakness || ''}
-
-Følgesvennens hobby:
-${bible.companion_hobby || ''}
-
-Følgesvennens favorittuttrykk:
-${bible.companion_phrase || ''}
-
+Hovedperson: ${childName}
+Fast følgesvenn: ${companionName} (${bible.companion_type})
+Følgesvennens personlighet: ${bible.companion_personality || ''}
+Følgesvennens styrke: ${bible.companion_power || ''}
+Følgesvennens svakhet: ${bible.companion_weakness || ''}
+Følgesvennens hobby: ${bible.companion_hobby || ''}
+Følgesvennens favorittuttrykk: ${bible.companion_phrase || ''}
 Langtidsoppdrag: ${bible.story_goal}
-Minne/historikk:
-${bible.memory || 'Ingen ekstra minne ennå.'}
 
 STORY STATE:
 ${stateText}
@@ -589,7 +570,7 @@ Dagens mål: ${episodePlan?.chapter_goal || ''}
 Nøkkelhendelse: ${episodePlan?.key_event || ''}
 Avslutningskrok: ${episodePlan?.ending_hook || ''}
 
-Aktive elementer fra foreldre / barnets verden:
+Aktive elementer:
 ${elementsText}
 
 Eksisterende karakterer:
@@ -599,23 +580,11 @@ Siste kapitler:
 ${historyText}
 
 PERSONLIG HISTORIESTIL:
-
-EKSTRA STILBANK:
-
-Åpningstype:
-${styleBank.opening?.content || ''}
-
-Avslutningstype:
-${styleBank.ending?.content || ''}
-
-Mysterietype:
-${styleBank.mystery?.content || ''}
-
-Dialogregel:
-${styleBank.dialog?.content || ''}
-
-Twist:
-${styleBank.twist?.content || ''}
+Åpningstype: ${styleBank.opening?.content || ''}
+Avslutningstype: ${styleBank.ending?.content || ''}
+Mysterietype: ${styleBank.mystery?.content || ''}
+Dialogregel: ${styleBank.dialog?.content || ''}
+Twist: ${styleBank.twist?.content || ''}
 
 Foreslått åpning:
 ${storyStyle.opening}
@@ -629,18 +598,17 @@ ${storyStyle.mysteryStyle}
 Forfatterinstruksjoner:
 ${storyStyle.authorInstructions.join('\n')}
 
-VIKTIGE REGLER:
+REGLER:
 - Skriv på norsk.
 - Barnet skal alltid være hovedpersonen.
+- Bruk ${childName} som hovedperson.
+- Bruk ${companionName} som følgesvenn.
 - Historien skal være varm, trygg, magisk og barnevennlig.
 - Passer som godnatthistorie.
 - Lengde ca. 700–1000 ord.
 - Dagens mål, nøkkelhendelse og avslutningskrok fra sesongplanen må brukes.
 - Historien må aldri starte på nytt.
-- Historien må aldri føles som første kapittel igjen.
-- Bruk minst én konkret ting fra tidligere kapitler eller serie-minnet.
-- Ikke bytt univers.
-- Ikke bytt hovedoppdrag.
+- Bruk minst én konkret ting fra tidligere kapitler.
 - Ikke gå fra dag til natt uten overgang.
 - Ikke la barnet finne selve hovedobjektet for tidlig.
 - Ikke løs store mysterier i samme kapittel som de introduseres.
@@ -649,32 +617,15 @@ VIKTIGE REGLER:
 - Følgesvennen må gjøre minst én viktig handling.
 - Følgesvennen skal ha egne tanker, reaksjoner og ideer.
 - Følgesvennen skal ikke bare si "Ja!", "La oss!" eller "Så spennende!".
-- Følgesvennen heter alltid ${bible.companion_name}.
-- Ikke endre navn på følgesvennen.
-- Ikke finn på mamma, pappa, søsken eller familie som ikke finnes i aktive elementer.
+- Ikke finn på familie som ikke finnes i aktive elementer.
 - Ingen banning, mobbing, våpen, krig, blod, skrekk, demoner, alkohol, tobakk, narkotika, pengespill eller voksenromantikk.
-
-KARAKTERDYBDE:
-- Når en karakter brukes, skal personlighet, frykt, drøm, hemmelighet, favorittting eller vane påvirke scenen.
-- Ikke la karakterer være flate hjelpere.
-- Tilbakevendende karakterer skal føles gjenkjennelige fra tidligere kapitler.
-- Nye karakterer skal få minst ett tydelig særtrekk.
-- Ikke avslør alle hemmeligheter med én gang.
-
-AVSLUTNING:
-- Dagens lille hendelse skal lukkes.
-- Barnet skal føle trygghet.
-- Kapittelet skal slutte rolig nok for leggetid.
-- Avslutningen skal samtidig gi en mild forventning til neste kapittel.
-- Bruk avslutningskroken fra sesongplanen.
-- Unngå generiske avslutninger som bare sier "de gledet seg til neste dag".
 
 Svar KUN som gyldig JSON uten markdown:
 {
   "title": "",
-  "summary": "Kort oppsummering av akkurat dette kapittelet.",
+  "summary": "",
   "story_text": "",
-  "continuity_update": "Kort oppdatering til serie-minnet: hva skjedde, hva ble funnet, hvem ble introdusert, og hva bør følges opp senere.",
+  "continuity_update": "",
   "state_update": {
     "active_goal": "",
     "completed_goals": [],
@@ -707,13 +658,13 @@ Svar KUN som gyldig JSON uten markdown:
   try {
     const generated = await callOpenAiJson<ChapterResult>({
       system:
-        'Du er en prisvinnende norsk barnebokforfatter og serieforfatter. Du skriver levende karakterer med tydelige personligheter. Du lar mysterier utvikle seg gradvis. Du unngår gjentakelser. Du unngår at nye karakterer løser problemer for hovedpersonene. Du sørger for at følgesvennen føles som en ekte figur med egne styrker, svakheter, vaner og meninger. Du skriver som en profesjonell forfatter, ikke som en AI-assistent. Du følger alltid sesongplanen, story_state, eksisterende karakterer og personlig historiestil. Du svarer alltid med ren JSON.',
+        'Du er en prisvinnende norsk barnebokforfatter. Du følger navnelås strengt. Du skriver levende karakterer, gradvise mysterier og trygge godnatthistorier. Du svarer alltid med ren JSON.',
       user: prompt,
       temperature: 0.54,
     });
 
     chapter = normalizeChapter(generated);
-    chapter = fixCompanionNames(chapter, bible.companion_name, child.child_name);
+    chapter = fixNames(chapter, childName, companionName);
   } catch (error) {
     return NextResponse.json(
       { error: `OpenAI-feil ved generering: ${errorMessage(error)}` },
@@ -722,8 +673,8 @@ Svar KUN som gyldig JSON uten markdown:
   }
 
   const checkerContext = `
-Barn: ${child.child_name}
-Følgesvenn: ${bible.companion_name}
+Barn: ${childName}
+Følgesvenn: ${companionName}
 Univers: ${bible.universe_name}
 Langtidsoppdrag: ${bible.story_goal}
 
@@ -736,18 +687,12 @@ ${episodePlan?.key_event || ''}
 Avslutningskrok:
 ${episodePlan?.ending_hook || ''}
 
-Eksisterende karakterer:
-${charactersText}
-
 Siste kapitler:
 ${historyText}
 `;
 
   try {
-    checker = await checkChapterQuality({
-      chapter,
-      checkerContext,
-    });
+    checker = await checkChapterQuality({ chapter, checkerContext });
 
     if (checker.should_rewrite || checker.total_score < 8) {
       chapter = await rewriteChapter({
@@ -756,7 +701,7 @@ ${historyText}
         checker,
       });
 
-      chapter = fixCompanionNames(chapter, bible.companion_name, child.child_name);
+      chapter = fixNames(chapter, childName, companionName);
       wasRewritten = true;
     }
   } catch (error) {
