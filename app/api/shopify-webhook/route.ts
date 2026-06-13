@@ -82,6 +82,15 @@ function shouldProcessOrder(order: ShopifyOrder) {
     return false;
   }
 
+  if (
+    financialStatus &&
+    financialStatus !== 'paid' &&
+    financialStatus !== 'authorized' &&
+    financialStatus !== 'partially_paid'
+  ) {
+    return false;
+  }
+
   return true;
 }
 
@@ -208,7 +217,7 @@ async function sendWelcomeEmail({
     sent_at: new Date().toISOString(),
   });
 
-  return resendData.id as string;
+  return String(resendData.id || '');
 }
 
 export async function POST(request: Request) {
@@ -267,7 +276,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         skipped: true,
-        reason: 'Ordren er kansellert/refundert/voided.',
+        reason: 'Ordren er ikke betalt, eller er kansellert/refundert/voided.',
         shopifyOrderId,
         parentEmail,
         financialStatus,
@@ -296,7 +305,7 @@ export async function POST(request: Request) {
 
     const parent = await getOrCreateParent(parentEmail);
 
-    let childId = typedExistingChild?.id;
+    let childId: string | null = typedExistingChild?.id ?? null;
 
     if (!childId) {
       const now = new Date().toISOString();
@@ -329,11 +338,15 @@ export async function POST(request: Request) {
         .select('id')
         .single();
 
-      if (childError || !newChild) {
+      if (childError || !newChild?.id) {
         throw new Error(`Kunne ikke opprette child: ${JSON.stringify(childError)}`);
       }
 
-      childId = newChild.id;
+      childId = String(newChild.id);
+    }
+
+    if (!childId) {
+      throw new Error('Mangler childId etter opprettelse av kunde.');
     }
 
     const messageId = await sendWelcomeEmail({
