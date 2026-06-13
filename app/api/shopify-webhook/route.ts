@@ -35,6 +35,45 @@ function cleanEmail(value: unknown) {
   return String(value || '').trim().toLowerCase();
 }
 
+function getOsloHour(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Oslo',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value || '0');
+
+  return hour === 24 ? 0 : hour;
+}
+
+function formatOsloDate(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Oslo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+
+  return `${year}-${month}-${day}`;
+}
+
+function getFirstChapterDate() {
+  const now = new Date();
+  const osloHour = getOsloHour(now);
+
+  if (osloHour < 12) {
+    return formatOsloDate(now);
+  }
+
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return formatOsloDate(tomorrow);
+}
+
 function getOrderEmail(order: ShopifyOrder) {
   return cleanEmail(
     order.email ||
@@ -306,10 +345,11 @@ export async function POST(request: Request) {
     const parent = await getOrCreateParent(parentEmail);
 
     let childId: string | null = typedExistingChild?.id ?? null;
+    let firstChapterDate = getFirstChapterDate();
 
     if (!childId) {
       const now = new Date().toISOString();
-      const today = new Date().toISOString().slice(0, 10);
+      firstChapterDate = getFirstChapterDate();
 
       const { data: newChild, error: childError } = await supabaseAdmin
         .from('children')
@@ -327,7 +367,7 @@ export async function POST(request: Request) {
           dreams: null,
           subscription_status: 'active',
           subscription_started_at: now,
-          next_chapter_date: today,
+          next_chapter_date: firstChapterDate,
           last_chapter_sent_at: null,
           onboarding_completed_at: null,
           onboarding_email_sent_at: null,
@@ -369,6 +409,7 @@ export async function POST(request: Request) {
       shopifyOrderId,
       financialStatus,
       topic,
+      firstChapterDate,
       messageId,
     });
   } catch (error) {
