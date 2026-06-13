@@ -1,5 +1,8 @@
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type StoryPageProps = {
   params: Promise<{ id: string }>;
 };
@@ -62,7 +65,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
 
   const { data: child } = await supabaseAdmin
     .from('children')
-    .select('next_chapter_date')
+    .select('id, next_chapter_date')
     .eq('id', story.child_id)
     .maybeSingle();
 
