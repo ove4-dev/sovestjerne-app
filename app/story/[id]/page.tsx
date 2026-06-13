@@ -4,6 +4,29 @@ type StoryPageProps = {
   params: Promise<{ id: string }>;
 };
 
+type StoryImage = {
+  image_url: string | null;
+  status: string | null;
+};
+
+function formatNorwegianDate(dateString?: string | null) {
+  if (!dateString) {
+    return 'snart';
+  }
+
+  const date = new Date(`${dateString}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'snart';
+  }
+
+  return new Intl.DateTimeFormat('nb-NO', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
 export default async function StoryPage({ params }: StoryPageProps) {
   const { id } = await params;
 
@@ -37,9 +60,19 @@ export default async function StoryPage({ params }: StoryPageProps) {
     );
   }
 
-  const approvedImage = story.story_images?.find(
+  const { data: child } = await supabaseAdmin
+    .from('children')
+    .select('next_chapter_date')
+    .eq('id', story.child_id)
+    .maybeSingle();
+
+  const approvedImage = (story.story_images as StoryImage[] | null)?.find(
     (image) => image.status === 'approved' && image.image_url
   );
+
+  const nextChapterText = child?.next_chapter_date
+    ? `Neste kapittel kommer ${formatNorwegianDate(child.next_chapter_date)}.`
+    : 'Neste kapittel kommer snart.';
 
   return (
     <main className="page-shell">
@@ -67,14 +100,14 @@ export default async function StoryPage({ params }: StoryPageProps) {
           )}
 
           <div
-  className="story-text-view"
-  style={{
-    whiteSpace: 'pre-line',
-    lineHeight: 1.9,
-  }}
->
-  {story.story_text}
-</div>
+            className="story-text-view"
+            style={{
+              whiteSpace: 'pre-line',
+              lineHeight: 1.9,
+            }}
+          >
+            {story.story_text}
+          </div>
 
           <div style={{ textAlign: 'center', marginTop: '30px' }}>
             <a
@@ -87,7 +120,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
           </div>
 
           <div className="story-footer">
-            <p>🌙 Neste kapittel kommer snart.</p>
+            <p>🌙 {nextChapterText}</p>
             <p>Sov godt og drøm magisk.</p>
           </div>
         </section>
