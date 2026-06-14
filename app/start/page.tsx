@@ -27,6 +27,7 @@ export default function StartPage() {
   const [personality, setPersonality] = useState('');
   const [thingsToAvoid, setThingsToAvoid] = useState('');
   const [dreams, setDreams] = useState('');
+  const [consent, setConsent] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,6 +83,11 @@ export default function StartPage() {
 
     if (!child) return;
 
+    if (!consent) {
+      setError('Du må bekrefte samtykke før du kan starte eventyret.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     setMessage('');
@@ -102,6 +108,7 @@ export default function StartPage() {
         personality,
         thingsToAvoid,
         dreams,
+        consent: true,
       }),
     });
 
@@ -149,8 +156,8 @@ export default function StartPage() {
           <h1>Start barnets eventyr</h1>
 
           <p>
-            Fyll ut barnets profil, så kan vi lage en personlig godnatthistorie
-            med navn, interesser, favorittdyr og riktig eventyrfølelse.
+            Fyll ut barnets profil, så lager vi personlige godnatthistorier med
+            navn, interesser, favorittdyr og riktig eventyrfølelse.
           </p>
         </section>
 
@@ -210,9 +217,7 @@ export default function StartPage() {
 
           <label>
             Favorittsted
-            <span className="help">
-              Et sted historien gjerne kan bruke.
-            </span>
+            <span className="help">Et sted historien gjerne kan bruke.</span>
             <input
               value={favoritePlace}
               onChange={(e) => setFavoritePlace(e.target.value)}
@@ -223,8 +228,8 @@ export default function StartPage() {
           <label>
             Hva liker barnet?
             <span className="help">
-              Skriv gjerne flere ting. For eksempel: biler, dinosaurer, hunder,
-              havet, fotball, prinsesser, romskip.
+              For eksempel biler, dinosaurer, hunder, havet, fotball,
+              prinsesser eller romskip.
             </span>
             <textarea
               value={interests}
@@ -237,7 +242,7 @@ export default function StartPage() {
           <label>
             Hvordan er barnet?
             <span className="help">
-              For eksempel nysgjerrig, modig, forsiktig, morsom, energisk,
+              For eksempel nysgjerrig, modig, forsiktig, morsom, energisk eller
               kreativ.
             </span>
             <textarea
@@ -251,7 +256,7 @@ export default function StartPage() {
           <label>
             Hva bør historien unngå?
             <span className="help">
-              For eksempel: ikke skummelt, ikke monstre, ikke høye lyder.
+              For eksempel ikke skummelt, ikke monstre eller ikke høye lyder.
             </span>
             <textarea
               value={thingsToAvoid}
@@ -273,7 +278,37 @@ export default function StartPage() {
             />
           </label>
 
-          <button className="button" type="submit" disabled={saving}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              marginTop: '12px',
+              fontWeight: 600,
+              lineHeight: 1.6,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              style={{
+                width: '18px',
+                height: '18px',
+                marginTop: '4px',
+                flexShrink: 0,
+              }}
+            />
+
+            <span>
+              Jeg bekrefter at jeg er barnets foresatte og samtykker til at
+              Sovestjerne behandler opplysningene jeg oppgir for å lage
+              personlige historier og levere tjenesten. Jeg kan når som helst be
+              om innsyn eller sletting av data.
+            </span>
+          </label>
+
+          <button className="button" type="submit" disabled={saving || !consent}>
             {saving ? 'Lagrer...' : 'Lagre og start eventyret'}
           </button>
         </form>
