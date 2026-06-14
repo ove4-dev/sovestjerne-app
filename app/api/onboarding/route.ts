@@ -21,6 +21,8 @@ type ChildRow = {
   dreams: string | null;
   subscription_status: string | null;
   onboarding_completed_at: string | null;
+  consent_given: boolean | null;
+  consent_given_at: string | null;
   created_at: string;
 };
 
@@ -47,7 +49,8 @@ function isIncomplete(child: ChildRow) {
     !child.interests ||
     !child.personality ||
     !child.dreams ||
-    !child.onboarding_completed_at
+    !child.onboarding_completed_at ||
+    !child.consent_given
   );
 }
 
@@ -94,6 +97,8 @@ async function getChildrenForParent(email: string, parentId?: string) {
     dreams,
     subscription_status,
     onboarding_completed_at,
+    consent_given,
+    consent_given_at,
     created_at
   `;
 
@@ -129,7 +134,6 @@ export async function GET(request: Request) {
   }
 
   const parent = await getParent(email);
-
   const children = await getChildrenForParent(email, parent?.id);
 
   if (!children.length) {
@@ -174,6 +178,7 @@ export async function POST(request: Request) {
   const personality = cleanText(body.personality);
   const thingsToAvoid = cleanText(body.thingsToAvoid);
   const dreams = cleanText(body.dreams);
+  const consent = Boolean(body.consent);
 
   if (!childId) {
     return NextResponse.json({ error: 'Mangler childId.' }, { status: 400 });
@@ -197,6 +202,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!consent) {
+    return NextResponse.json(
+      { error: 'Du må samtykke før profilen kan lagres.' },
+      { status: 400 }
+    );
+  }
+
   const parent = await getParent(email);
   const children = await getChildrenForParent(email, parent?.id);
   const allowedChild = children.find((child) => child.id === childId);
@@ -207,6 +219,8 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const now = new Date().toISOString();
 
   const { data, error } = await supabaseAdmin
     .from('children')
@@ -224,7 +238,9 @@ export async function POST(request: Request) {
       dreams,
       subscription_status: 'active',
       next_chapter_date: new Date().toISOString().slice(0, 10),
-      onboarding_completed_at: new Date().toISOString(),
+      onboarding_completed_at: now,
+      consent_given: true,
+      consent_given_at: now,
     })
     .eq('id', childId)
     .select()
