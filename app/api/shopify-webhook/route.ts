@@ -4,6 +4,15 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export const runtime = 'nodejs';
 
+type ShopifyLineItemProperty = {
+  name?: string | null;
+  value?: string | null;
+};
+
+type ShopifyLineItem = {
+  properties?: ShopifyLineItemProperty[] | null;
+};
+
 type ShopifyOrder = {
   id?: string | number;
   name?: string;
@@ -12,6 +21,7 @@ type ShopifyOrder = {
   contact_email?: string | null;
   financial_status?: string | null;
   cancelled_at?: string | null;
+  line_items?: ShopifyLineItem[] | null;
   customer?: {
     email?: string | null;
     first_name?: string | null;
@@ -33,6 +43,10 @@ type ChildRow = {
 
 function cleanEmail(value: unknown) {
   return String(value || '').trim().toLowerCase();
+}
+
+function cleanText(value: unknown) {
+  return String(value || '').trim();
 }
 
 function getOsloHour(date: Date) {
@@ -85,6 +99,36 @@ function getOrderEmail(order: ShopifyOrder) {
 
 function getOrderId(order: ShopifyOrder) {
   return String(order.id || '').trim();
+}
+
+function getPropertyValue(
+  properties: ShopifyLineItemProperty[],
+  propertyName: string
+) {
+  return cleanText(
+    properties.find((property) => property.name === propertyName)?.value || ''
+  );
+}
+
+function getGiftInfo(order: ShopifyOrder) {
+  const properties = order.line_items?.[0]?.properties || [];
+
+  const isGift =
+    getPropertyValue(properties, 'Er dette en gave?').toLowerCase() === 'ja';
+
+  const giftParentEmail = cleanEmail(
+    getPropertyValue(properties, 'Forelders e-post')
+  );
+
+  const giftChildName = cleanText(
+    getPropertyValue(properties, 'Barnets navn')
+  );
+
+  return {
+    isGift,
+    giftParentEmail,
+    giftChildName,
+  };
 }
 
 function verifyShopifyHmac({
@@ -163,43 +207,49 @@ async function getOrCreateParent(parentEmail: string) {
 async function sendWelcomeEmail({
   parentEmail,
   childId,
+  isGift,
 }: {
   parentEmail: string;
   childId: string;
+  isGift: boolean;
 }) {
   const appUrl =
     process.env.NEXT_PUBLIC_SITE_URL || 'https://app.sovestjerne.no';
 
   const startUrl = `${appUrl}/foreldre/login?next=/start`;
 
-  const subject = '🌙 Velkommen til Sovestjerne – start barnets eventyr';
+  const subject = isGift
+    ? '🎁 Noen har gitt barnet ditt et Sovestjerne-eventyr'
+    : '🌙 Velkommen til Sovestjerne – start barnets eventyr';
+
+  const introText = isGift
+    ? 'Noen har gitt barnet ditt et personlig Sovestjerne-eventyr i gave.'
+    : 'Takk for bestillingen.';
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#fff8ea;color:#0b1220;">
       <div style="background:#071437;color:white;padding:30px;border-radius:22px;text-align:center;">
         <h1 style="margin:0;font-size:32px;">🌙 Sovestjerne</h1>
         <p style="margin:12px 0 0;color:#fff7d7;font-size:17px;">
-          Barnets personlige godnatthistorie starter her
+          Barnets personlige eventyr starter her
         </p>
       </div>
 
       <div style="background:white;margin-top:20px;padding:28px;border-radius:22px;border:1px solid #eee;">
-        <h2 style="margin-top:0;color:#0b1d4f;">
-          Velkommen til Sovestjerne!
-        </h2>
+        <h2 style="margin-top:0;color:#0b1d4f;">Velkommen til Sovestjerne!</h2>
 
         <p>Hei!</p>
 
+        <p>${introText}</p>
+
         <p>
-          Takk for bestillingen. Nå trenger vi bare litt informasjon om barnet,
-          slik at vi kan lage en personlig godnatthistorie med riktig navn,
-          interesser, favorittdyr og eventyrstil.
+          Nå trenger vi bare litt informasjon om barnet, slik at vi kan lage en
+          personlig historie med riktig navn, interesser, favorittdyr og eventyrstil.
         </p>
 
         <p>
-          Trykk på knappen under. Du logger inn med e-posten du brukte ved kjøp,
-          får en engangskode på e-post, og kommer deretter til skjemaet hvor du
-          fyller ut barnets eventyrprofil.
+          Trykk på knappen under. Du logger inn med e-posten din, får en engangskode
+          på e-post, og kommer deretter til skjemaet hvor du fyller ut barnets profil.
         </p>
 
         <p style="text-align:center;margin:32px 0;">
@@ -290,9 +340,21 @@ export async function POST(request: Request) {
 
     const order = JSON.parse(rawBody) as ShopifyOrder;
 
-    const parentEmail = getOrderEmail(order);
+    const buyerEmail = getOrderEmail(order);
     const shopifyOrderId = getOrderId(order);
     const financialStatus = String(order.financial_status || '').toLowerCase();
+
+    const { isGift, giftParentEmail, giftChildName } = getGiftInfo(order);
+
+    const parentEmail =
+      isGift && giftParentEmail
+        ? giftParentEmail
+        : buyerEmail;
+
+    const initialChildName =
+      isGift && giftChildName
+        ? giftChildName
+        : 'Ikke utfylt ennå';
 
     if (!shopifyOrderId) {
       return NextResponse.json(
@@ -305,8 +367,10 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         skipped: true,
-        reason: 'Ordren mangler e-post.',
+        reason: 'Ordren mangler gyldig e-post.',
         shopifyOrderId,
+        buyerEmail,
+        giftParentEmail,
         topic,
       });
     }
@@ -317,6 +381,7 @@ export async function POST(request: Request) {
         skipped: true,
         reason: 'Ordren er ikke betalt, eller er kansellert/refundert/voided.',
         shopifyOrderId,
+        buyerEmail,
         parentEmail,
         financialStatus,
         topic,
@@ -336,7 +401,9 @@ export async function POST(request: Request) {
         success: true,
         alreadyProcessed: true,
         childId: typedExistingChild.id,
+        buyerEmail,
         parentEmail,
+        isGift,
         shopifyOrderId,
         topic,
       });
@@ -356,7 +423,7 @@ export async function POST(request: Request) {
         .insert({
           parent_email: parentEmail,
           parent_id: parent.id,
-          child_name: 'Ikke utfylt ennå',
+          child_name: initialChildName,
           child_age: null,
           favorite_animal: null,
           favorite_color: null,
@@ -392,6 +459,7 @@ export async function POST(request: Request) {
     const messageId = await sendWelcomeEmail({
       parentEmail,
       childId,
+      isGift,
     });
 
     await supabaseAdmin
@@ -405,7 +473,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       childId,
+      buyerEmail,
       parentEmail,
+      isGift,
+      giftChildName,
       shopifyOrderId,
       financialStatus,
       topic,
